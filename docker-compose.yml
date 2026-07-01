@@ -1,0 +1,51 @@
+# Sexualsync self-host edition.
+#
+# Single Node service serving the same product code as the Cloudflare app, with
+# filesystem-backed storage on a persistent volume. This file is for self-host
+# operators only; it has nothing to do with the Cloudflare production deploy.
+#
+# First run (zero config):
+#   docker compose version   # requires Docker Compose v2.24+
+#   docker compose up --build
+#   # → boots, auto-generates a strong secret on the data volume, encrypts at rest
+#
+# Health check: http://localhost:8788/api/health
+# Local email/password sign-in works with zero config. Copy
+# .env.selfhost.example to .env.selfhost only to seed partner emails or enable
+# optional Google / Resend email-code auth.
+
+services:
+  sexualsync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sexualsync-selfhost
+    container_name: sexualsync-selfhost
+    ports:
+      # Localhost-only by default. Put Caddy/nginx/Traefik on the same host in
+      # front of this port for public TLS exposure.
+      - "127.0.0.1:8788:8788"
+    # Operator config - OPTIONAL. With no .env.selfhost the server still boots
+    # securely (auto-generated, persisted APP_SESSION_SECRET -> at-rest
+    # encryption + sessions work) and local email/password auth is enabled.
+    # Add the file to configure optional external auth / seed couple emails.
+    # (`required: false` needs Docker Compose v2.24+.)
+    env_file:
+      - path: .env.selfhost
+        required: false
+    environment:
+      PORT: "8788"
+      SELFHOST_DATA_DIR: /data
+      # TRUST_PROXY is intentionally NOT pinned here. It defaults to false — the
+      # secure default, so a directly-exposed container never trusts spoofable
+      # X-Forwarded-* headers (which would let a client forge the origin/proto used
+      # by cookie-Secure and CSRF/origin checks). Running behind a TLS-terminating
+      # reverse proxy? Set TRUST_PROXY=true in .env.selfhost so OAuth redirects and
+      # origin checks see the real https origin. Leaving it out of `environment:`
+      # is deliberate — that lets the .env.selfhost value take effect.
+    volumes:
+      - sexualsync-data:/data
+    restart: unless-stopped
+
+volumes:
+  sexualsync-data:

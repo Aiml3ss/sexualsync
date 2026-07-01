@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Sexualsync">
+  <title>Sexualsync</title>
+  <rect width="32" height="32" rx="7" fill="#170a10"></rect>
+  <path d="M 6,17 C 9,11 14,11 16,17 C 18,23 23,23 26,17" fill="none" stroke="#e9a8b3" stroke-width="2.5" stroke-linecap="round"></path>
+</svg>

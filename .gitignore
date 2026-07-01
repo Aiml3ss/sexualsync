@@ -1,0 +1,34 @@
+# Build/install artifacts
+node_modules/
+dist/
+.next/
+.vercel/
+.expo/
+.wrangler/
+test-results/
+playwright-report/
+artifacts/
+
+# repowise local codebase index (db, vector store, caches). Never commit.
+.repowise/
+
+# Local-only config and env
+.env
+.env.local
+.env.*.local
+.env.selfhost
+.DS_Store
+.claude/
+
+# Self-host runtime data (filesystem KV + Vault media). Never commit.
+selfhost-data/
+
+# Sensitive migration/export artifacts
+migration-export/
+
+
+# Local Netlify folder
+.netlify
+
+# Local MCP server config (per-developer, absolute paths)
+.mcp.json

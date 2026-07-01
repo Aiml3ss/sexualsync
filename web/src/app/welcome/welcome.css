@@ -1,0 +1,145 @@
+/* /welcome — one-time post-accept overlay */
+
+.welcome-stage {
+  padding: 4px 22px max(28px, calc(16px + var(--safe-area-bottom)));
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.welcome-list li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.welcome-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--accent-mist);
+  border: 1px solid var(--accent-fog);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.welcome-step-title {
+  margin: 0 0 2px;
+  font-family: var(--body);
+  font-size: 13.5px;
+  color: var(--cream);
+  font-weight: 500;
+}
+.welcome-step-title strong { color: var(--cream); font-weight: 600; }
+
+.welcome-step-sub {
+  margin: 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--cream-muted);
+  line-height: 1.45;
+}
+
+.welcome-cta {
+  width: 100%;
+  min-height: 52px;
+  font-size: 15px;
+  margin-top: 8px;
+}
+
+.welcome-foot {
+  margin-top: 16px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--cream-faint);
+}
+
+/* ── Premium polish ──────────────────────────────────────────────────────────
+   This is the first screen after two people pair — it should feel like an
+   arrival, not a form. The steps cascade in just behind the page's route-enter,
+   each step card answers a hover, and the "Open the room" CTA breathes so the
+   eye lands on it. All gated by prefers-reduced-motion below. */
+
+.welcome-list li {
+  opacity: 0;
+  animation: welcome-step-rise 560ms var(--ease-bloom, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  transition:
+    transform var(--dur-state, 320ms) var(--ease-settle, ease),
+    border-color var(--dur-state, 320ms) var(--ease-settle, ease),
+    background var(--dur-state, 320ms) var(--ease-settle, ease);
+}
+.welcome-list li:nth-child(1) { animation-delay: 150ms; }
+.welcome-list li:nth-child(2) { animation-delay: 240ms; }
+.welcome-list li:nth-child(3) { animation-delay: 330ms; }
+.welcome-list li:nth-child(4) { animation-delay: 420ms; }
+
+@keyframes welcome-step-rise {
+  from { opacity: 0; transform: translateY(11px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (hover: hover) {
+  .welcome-list li:hover {
+    transform: translateY(-1px);
+    border-color: var(--accent-fog);
+    background:
+      linear-gradient(180deg, rgba(243, 220, 217, 0.045), transparent),
+      var(--surface);
+  }
+}
+
+/* The number badge picks up a soft rose glow so the steps feel lit, not boxed. */
+.welcome-num {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 0 16px rgba(233, 168, 179, 0.16);
+}
+
+/* Celebratory breathing CTA — the same lit-object language as the sign-in,
+   adapted to the standard primary button rather than cloning it. */
+.welcome-cta {
+  animation: welcome-cta-breathe 5s ease-in-out 900ms infinite;
+}
+@keyframes welcome-cta-breathe {
+  0%, 100% {
+    box-shadow: 0 8px 24px var(--accent-fog), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+  50% {
+    box-shadow: 0 14px 38px rgba(233, 168, 179, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-list li {
+    opacity: 1;
+    animation: none;
+    transition: none;
+  }
+  .welcome-list li:hover {
+    transform: none;
+  }
+  .welcome-cta {
+    animation: none;
+  }
+}

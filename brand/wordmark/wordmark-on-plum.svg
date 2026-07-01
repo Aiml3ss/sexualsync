@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 220" role="img" aria-label="Sexualsync wordmark on plum">
+  <title>Sexualsync wordmark on plum</title>
+  <rect width="720" height="220" rx="32" fill="#170a10"></rect>
+  <g transform="translate(60 50)">
+    <text x="0" y="92" fill="#f3dcd9" font-family="Cormorant Garamond, Georgia, serif" font-size="104" font-style="italic" font-weight="500">sexual</text>
+    <circle cx="298" cy="78" r="7" fill="#e9a8b3"></circle>
+    <text x="320" y="92" fill="#e9a8b3" font-family="Cormorant Garamond, Georgia, serif" font-size="104" font-style="italic" font-weight="500">sync</text>
+  </g>
+</svg>

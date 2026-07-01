@@ -1,0 +1,32 @@
+# Reinstalled / rebuilt inside the image — keep the build context small.
+node_modules
+web/node_modules
+.git
+.github
+.claude
+.codex
+.next
+web/.next
+dist
+.vercel
+.wrangler
+**/.wrangler
+**/.turbo
+coverage
+mobile/node_modules
+mobile/.expo
+mobile/.gradle
+
+# Runtime data + local secrets must never enter the image.
+selfhost-data
+.env
+.env.local
+.env.selfhost
+.env.*.local
+
+# Test / CI artifacts.
+test-results
+playwright-report
+artifacts
+*.log
+.DS_Store

@@ -1,0 +1,260 @@
+.pwa-install-pill {
+  position: relative;
+  z-index: 79;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(396px, calc(100vw - 28px));
+  min-height: 44px;
+  margin: max(12px, calc(8px + var(--safe-area-top))) auto 0;
+  padding: 7px 8px 7px 13px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: rgba(var(--surface-2-rgb), 0.94);
+  background-clip: padding-box;
+  color: var(--cream);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.30),
+    inset 0 0 0 1px var(--hairline-strong),
+    0 0 0 1px rgba(var(--accent-rgb), 0.08);
+  backdrop-filter: blur(16px);
+}
+
+.pwa-install-pill span {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--cream) 78%, transparent);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pwa-install-pill button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--accent-mist);
+  background-clip: padding-box;
+  box-shadow: var(--ring-accent-fog, inset 0 0 0 1px var(--accent-fog));
+  color: var(--cream);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.pwa-install-pill button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.pwa-install-pill .pwa-pill-dismiss {
+  max-width: 58px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: var(--ring-hairline, inset 0 0 0 1px var(--hairline));
+  color: var(--cream-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-install-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  align-items: end;
+  padding: 18px 14px max(18px, calc(18px + env(safe-area-inset-bottom)));
+  background: rgba(10, 4, 8, 0.55);
+  backdrop-filter: blur(10px);
+}
+
+.pwa-install-sheet {
+  width: min(420px, 100%);
+  margin: 0 auto;
+  padding: 22px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(var(--cream-rgb), 0.07), rgba(var(--cream-rgb), 0.02)),
+    rgb(var(--surface-rgb));
+  color: var(--cream);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.44);
+}
+
+.pwa-install-eyebrow {
+  margin: 0 0 10px;
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.pwa-install-sheet h2 {
+  margin: 0;
+  color: var(--cream);
+  font-family: var(--display);
+  font-size: 30px;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.pwa-install-sheet ol {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding-left: 20px;
+  color: var(--cream-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.pwa-install-sheet li::marker {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.pwa-install-sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.mobile-access-loading {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.mobile-access-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, calc(24px + var(--safe-area-top))) 22px max(24px, calc(24px + var(--safe-area-bottom)));
+}
+
+.mobile-access-panel {
+  position: relative;
+  z-index: 2;
+  width: min(460px, 100%);
+  text-align: center;
+}
+
+.mobile-access-mark {
+  width: min(340px, 64vw);
+  height: 220px;
+  margin: -18px auto 0;
+}
+
+.mobile-access-eyebrow {
+  margin: 0 0 14px;
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.30em;
+  text-transform: uppercase;
+}
+
+.mobile-access-panel h1 {
+  margin: 0 auto;
+  max-width: 9em;
+  color: var(--cream);
+  font-family: var(--display);
+  font-size: 58px;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 0.96;
+  text-wrap: balance;
+}
+
+.mobile-access-body {
+  margin: 16px auto 0;
+  max-width: 34ch;
+  color: var(--cream-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.mobile-access-description {
+  margin: 22px auto 0;
+  max-width: 36ch;
+  color: var(--cream);
+  font-family: var(--display);
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.mobile-access-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 34px;
+}
+
+.mobile-access-primary,
+.mobile-access-copy {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 850;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-access-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  background-clip: padding-box;
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: 0 14px 34px var(--accent-fog), var(--ring-accent-fog, inset 0 0 0 1px var(--accent-fog));
+}
+
+.mobile-access-copy {
+  background: rgba(var(--cream-rgb), 0.045);
+  background-clip: padding-box;
+  color: var(--cream);
+  box-shadow:
+    var(--ring-hairline-strong, inset 0 0 0 1px var(--hairline-strong)),
+    0 14px 30px rgba(0, 0, 0, 0.24);
+}
+
+@media (max-width: 360px) {
+  .mobile-access-panel h1 {
+    font-size: 46px;
+  }
+
+  .pwa-install-pill {
+    align-items: stretch;
+    border-radius: 18px;
+    flex-wrap: wrap;
+  }
+
+  .pwa-install-pill span {
+    flex-basis: 100%;
+    white-space: normal;
+  }
+
+  .pwa-install-pill button {
+    flex: 1 1 auto;
+  }
+
+  .pwa-install-sheet-actions {
+    grid-template-columns: 1fr;
+  }
+}

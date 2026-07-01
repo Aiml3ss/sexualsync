@@ -1,0 +1,279 @@
+/* Onboarding flow (Create your room → Share the link).
+   Mirrors the brand tokens already defined in globals.css. */
+
+.onboarding-stage {
+  position: relative;
+  z-index: 2;
+  padding: 0 22px max(28px, calc(16px + var(--safe-area-bottom)));
+  display: flex;
+  flex-direction: column;
+}
+
+.onboarding-form,
+.onboarding-share {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-top: 4px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--cream-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  margin-bottom: 7px;
+  font-weight: 500;
+}
+
+.field-hint {
+  font-family: var(--body);
+  font-size: 11.5px;
+  color: var(--cream-faint);
+  margin-top: 5px;
+  font-style: italic;
+}
+
+.onboarding-submit {
+  margin-top: 18px;
+  width: 100%;
+  min-height: 52px;
+  font-size: 15px;
+}
+
+.onboarding-secondary {
+  margin-top: 10px;
+  width: 100%;
+  min-height: 48px;
+  font-size: 13.5px;
+}
+
+.onboarding-foot {
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: var(--cream-faint);
+  line-height: 1.6;
+}
+
+.onboarding-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(201, 138, 130, 0.4);
+  background: rgba(201, 138, 130, 0.12);
+  color: var(--no);
+  border-radius: 10px;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Share-the-link stage */
+
+.onboarding-link-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--accent-fog);
+  border-radius: 14px;
+  padding: 16px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.onboarding-link-url {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--cream);
+  word-break: break-all;
+  user-select: all;
+}
+
+.onboarding-copy-pill {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  min-width: 64px;
+  transition: background var(--dur-state, 180ms) ease;
+}
+
+.onboarding-copy-pill:hover {
+  background: var(--accent-soft);
+}
+
+.onboarding-share-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+
+.onboarding-share-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 14px 6px;
+  font-family: var(--body);
+  font-size: 11.5px;
+  color: var(--cream-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--dur-state, 180ms) ease, border-color var(--dur-state, 180ms) ease;
+  min-height: 64px;
+  justify-content: center;
+}
+
+.onboarding-share-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--hairline-strong);
+}
+
+.onboarding-share-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--accent-mist);
+  border: 1px solid var(--accent-fog);
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.onboarding-share-actions {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+/* ── Premium polish ──────────────────────────────────────────────────────────
+   Creating the room is an arrival moment too. Fields and share controls cascade
+   in just behind the page's route-enter; the copy + share controls gain real
+   tactile depth — press scale, hover lift, a glyph that pops. Reduced-motion
+   guard at the foot. */
+
+.onboarding-form > *,
+.onboarding-share > * {
+  opacity: 0;
+  animation: onboarding-rise 520ms var(--ease-bloom, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.onboarding-form > *:nth-child(1),
+.onboarding-share > *:nth-child(1) { animation-delay: 120ms; }
+.onboarding-form > *:nth-child(2),
+.onboarding-share > *:nth-child(2) { animation-delay: 200ms; }
+.onboarding-form > *:nth-child(3),
+.onboarding-share > *:nth-child(3) { animation-delay: 280ms; }
+.onboarding-form > *:nth-child(4),
+.onboarding-share > *:nth-child(4) { animation-delay: 360ms; }
+.onboarding-form > *:nth-child(n + 5),
+.onboarding-share > *:nth-child(n + 5) { animation-delay: 440ms; }
+
+@keyframes onboarding-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Copy pill — a lit rose chip that answers a press. */
+.onboarding-copy-pill {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 4px 14px var(--accent-fog);
+  transition:
+    background var(--dur-state, 320ms) var(--ease-settle, ease),
+    box-shadow var(--dur-state, 320ms) var(--ease-settle, ease),
+    transform var(--dur-tap, 120ms) var(--ease-exit, ease);
+}
+@media (hover: hover) {
+  .onboarding-copy-pill:hover {
+    background: var(--accent-soft);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.26),
+      0 6px 18px rgba(233, 168, 179, 0.5);
+  }
+}
+.onboarding-copy-pill:active { transform: scale(0.94); }
+
+/* Copy success — a quick spring pop confirms the link is on the clipboard. */
+.onboarding-copy-pill.is-copied {
+  animation: copy-pop 440ms var(--ease-spring, ease);
+}
+@keyframes copy-pop {
+  0%   { transform: scale(1); }
+  42%  { transform: scale(1.13); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-copy-pill.is-copied {
+    animation: none;
+  }
+}
+
+/* Share tiles — lift + brighten + pop the glyph on hover; settle on press. */
+.onboarding-share-btn {
+  transition:
+    background var(--dur-state, 320ms) var(--ease-settle, ease),
+    border-color var(--dur-state, 320ms) var(--ease-settle, ease),
+    transform var(--dur-release, 320ms) var(--ease-press, ease),
+    box-shadow var(--dur-state, 320ms) var(--ease-settle, ease);
+}
+@media (hover: hover) {
+  .onboarding-share-btn:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-fog);
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+  }
+  .onboarding-share-btn:hover .onboarding-share-icon {
+    transform: scale(1.08);
+    box-shadow: 0 0 18px rgba(233, 168, 179, 0.28);
+  }
+}
+.onboarding-share-btn:active { transform: translateY(0) scale(0.97); }
+
+.onboarding-share-icon {
+  transition:
+    transform var(--dur-release, 320ms) var(--ease-press, ease),
+    box-shadow var(--dur-state, 320ms) var(--ease-settle, ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-form > *,
+  .onboarding-share > * {
+    opacity: 1;
+    animation: none;
+  }
+  .onboarding-copy-pill,
+  .onboarding-share-btn,
+  .onboarding-share-icon {
+    transition: none;
+  }
+  .onboarding-copy-pill:active,
+  .onboarding-share-btn:hover,
+  .onboarding-share-btn:active,
+  .onboarding-share-btn:hover .onboarding-share-icon {
+    transform: none;
+  }
+}

@@ -1,0 +1,238 @@
+/* ============================================================================
+   Sexualsync · animation primitives
+   Drop into your global stylesheet. Apply via class names listed in
+   MOTION.md. All durations/easings tuned for the "velvet room" feel — slow
+   and considered, with cinematic overshoot on big moments.
+   ============================================================================ */
+
+/* ---------- AMBIENT (looping) ---------- */
+
+@keyframes ribbon-breath {
+  0%   { opacity: 0.78; transform: scale(0.995); }
+  100% { opacity: 1;    transform: scale(1.012); }
+}
+
+/* Wave / dot pulse — slow breath for low-stakes "live" state */
+@keyframes ss-breathe {
+  0%, 100% { opacity: 0.32; transform: scaleY(1); }
+  50%      { opacity: 0.60; transform: scaleY(1.18); }
+}
+.ss-breathe { animation: ss-breathe 3.2s ease-in-out infinite; transform-origin: center; }
+
+/* Pulse states — for the Sexboard hero waveform.
+   Amplitude and rhythm modulate by what's happening in the room.
+
+   Smoothness notes:
+   - Every transform ends with translateZ(0) (or uses translate3d) so the SVG
+     path is promoted to a GPU composited layer instead of being repainted
+     each frame on the main thread.
+   - will-change: transform, opacity tells the browser to keep that layer
+     hot, which eliminates the warm-up hitch when state changes.
+   - Multi-keyframe rhythms (hot, sync) use per-keyframe timing functions so
+     the wave doesn't pause-at-zero-velocity at every intermediate keyframe
+     (the source of the "choppy" feel). */
+@keyframes ss-pulse-quiet   {
+  0%, 100% { opacity: 0.42; transform: scaleY(0.84) translateZ(0); }
+  50%      { opacity: 0.84; transform: scaleY(1.18) translateZ(0); }
+}
+@keyframes ss-pulse-pending {
+  0%, 100% { opacity: 0.50; transform: scaleY(0.88) translateZ(0); }
+  50%      { opacity: 0.90; transform: scaleY(1.24) translateZ(0); }
+}
+@keyframes ss-pulse-lit {
+  0%, 100% { opacity: 0.70; transform: scaleY(0.94) translateZ(0); }
+  50%      { opacity: 1.00; transform: scaleY(1.32) translateZ(0); }
+}
+@keyframes ss-pulse-hot {
+  0%, 100% { opacity: 0.82; transform: scaleY(1.00) translateZ(0); }
+  50%      { opacity: 1.00; transform: scaleY(1.40) translateZ(0); }
+}
+.ss-pulse-quiet,
+.ss-pulse-pending,
+.ss-pulse-lit,
+.ss-pulse-hot {
+  transform-origin: center;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+/* ease-in-out is the natural sinusoid for a 2-keyframe base→peak→base pulse;
+   any smoothstep variant introduces a sharper acceleration that reads as
+   less calm. */
+.ss-pulse-quiet   { animation: ss-pulse-quiet   4.0s ease-in-out infinite; }
+.ss-pulse-pending { animation: ss-pulse-pending 2.6s ease-in-out infinite; }
+.ss-pulse-lit     { animation: ss-pulse-lit     2.0s ease-in-out infinite; }
+.ss-pulse-hot     { animation: ss-pulse-hot     1.4s ease-in-out infinite; }
+.ss-pulse-partner { animation-delay: 0.8s; }       /* offset second wave */
+
+@keyframes ss-pulse-sweep {
+  0%   { opacity: 0;    stroke-dashoffset: 460; transform: scaleY(0.86) translateZ(0); }
+  16%  { opacity: 0.68; }
+  52%  { opacity: 0.92; transform: scaleY(1.22) translateZ(0); }
+  100% { opacity: 0;    stroke-dashoffset: 0;   transform: scaleY(0.92) translateZ(0); }
+}
+.ss-pulse-sweep {
+  animation: ss-pulse-sweep 2.8s ease-in-out infinite;
+  stroke-dasharray: 92 368;
+  stroke-dashoffset: 460;
+  transform-origin: center;
+  transform-box: fill-box;
+  backface-visibility: hidden;
+  will-change: transform, opacity, stroke-dashoffset;
+}
+.ss-pulse-sweep--off {
+  animation: none;
+  opacity: 0;
+}
+
+/* Sync rhythm: two waves "meet at center" and hold briefly before parting.
+   The original 5-keyframe pattern (0/28/48/68/100) created a zero-velocity
+   stop at every intermediate keyframe — visible as micro-pauses, the source
+   of the "choppy" feel. Collapsed to a single peak with a smoothstep ease
+   that naturally lingers at the peak via the cubic curve. Same destination
+   coordinates (translateY ±12px, scaleY 1.18), continuous motion. */
+@keyframes ss-pulse-sync-you {
+  0%, 100% { opacity: 0.58; transform: translate3d(0, 0, 0) scaleY(0.88); }
+  50%      { opacity: 1.00; transform: translate3d(0, 12px, 0) scaleY(1.18); }
+}
+@keyframes ss-pulse-sync-partner {
+  0%, 100% { opacity: 0.54; transform: translate3d(0, 0, 0) scaleY(0.88); }
+  50%      { opacity: 0.96; transform: translate3d(0, -12px, 0) scaleY(1.18); }
+}
+.ss-pulse-sync-you,
+.ss-pulse-sync-partner {
+  animation-duration: 2.35s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+.ss-pulse-sync-you { animation-name: ss-pulse-sync-you; }
+.ss-pulse-sync-partner { animation-name: ss-pulse-sync-partner; }
+.ss-pulse-sync-hot {
+  animation-duration: 1.8s;
+}
+
+/* Dot pulse — for "WAITING ON PARTNER" chip dot */
+@keyframes ss-dot-pulse {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  50%      { transform: scale(1.40); opacity: 0.5; }
+}
+.ss-dot-pulse { animation: ss-dot-pulse 1.8s ease-in-out infinite; }
+
+/* Wave drift — subtle vertical breath on the header glyph */
+@keyframes ss-wave-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+.ss-wave-drift { animation: ss-wave-drift 6s ease-in-out infinite; }
+
+/* ---------- ENTRY (one-shot reveals) ---------- */
+
+/* Fade up — soft entry for secondary content. Stagger via animation-delay. */
+@keyframes ss-fade-up {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.ss-fade-up { animation: ss-fade-up 0.65s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+
+/* Word land — settles with small overshoot. Use on the headline of magic moments. */
+@keyframes ss-word-land {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.92); }
+  60%  { opacity: 1; transform: translateY(-3px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.ss-word-land { animation: ss-word-land 0.85s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Rose bloom — radial expansion behind a magic moment */
+@keyframes ss-rose-bloom {
+  0%   { opacity: 0;    transform: scale(0.4); }
+  40%  { opacity: 1; }
+  100% { opacity: 0.85; transform: scale(1.15); }
+}
+.ss-rose-bloom { animation: ss-rose-bloom 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* Chip land — for reaction-reveal centerpiece chip */
+@keyframes ss-chip-land {
+  0%   { opacity: 0; transform: scale(0.50) rotate(-6deg); }
+  55%  { opacity: 1; transform: scale(1.08) rotate(2deg); }
+  80%  {             transform: scale(0.97) rotate(-1deg); }
+  100% { opacity: 1; transform: scale(1)    rotate(0); }
+}
+.ss-chip-land { animation: ss-chip-land 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Notification land — slides down from top with overshoot */
+@keyframes ss-notif-in {
+  0%   { opacity: 0; transform: translateY(-44px) scale(0.96); }
+  70%  {             transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.ss-notif-in { animation: ss-notif-in 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ---------- INTERACTION ---------- */
+
+/* Match strike — Ask tile selection. Rose-glow flash + scale + settle. */
+@keyframes ss-match-strike {
+  0%   { transform: scale(1);    box-shadow: 0 0 0px   rgba(233,168,179,0); }
+  20%  { transform: scale(1.04); box-shadow: 0 0 40px  rgba(233,168,179,0.55); }
+  45%  { transform: scale(0.99); box-shadow: 0 0 20px  rgba(233,168,179,0.35); }
+  100% { transform: scale(1);    box-shadow: 0 0 24px  rgba(233,168,179,0.25); }
+}
+.ss-match-strike { animation: ss-match-strike 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Check draw — drawing animation for the tile's tick */
+@keyframes ss-check-draw { 0% { stroke-dashoffset: 24; } 100% { stroke-dashoffset: 0; } }
+.ss-check-path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: ss-check-draw 0.4s 0.18s ease-out forwards; }
+
+/* Send flight — paper plane arcs up off-screen */
+@keyframes ss-send-flight {
+  0%   { opacity: 0;    transform: translate(-50%, 0)     scale(0.8); }
+  15%  { opacity: 1;    transform: translate(-50%, -30px) scale(1); }
+  85%  { opacity: 0.85; transform: translate(-50%, -300px) scale(0.6) rotate(-12deg); }
+  100% { opacity: 0;    transform: translate(-50%, -360px) scale(0.4) rotate(-18deg); }
+}
+.ss-send-flight { animation: ss-send-flight 1.4s cubic-bezier(0.45, 0, 0.55, 1) both; position: absolute; left: 50%; }
+
+/* Chip swap — old chip blurs out, new chip arrives sharp */
+@keyframes ss-chip-out { 0% { opacity: 1; transform: scale(1);   filter: blur(0); }
+                         100% { opacity: 0; transform: scale(0.9); filter: blur(3px); } }
+@keyframes ss-chip-in  { 0% { opacity: 0; transform: scale(0.9); filter: blur(3px); }
+                         100% { opacity: 1; transform: scale(1);   filter: blur(0); } }
+.ss-chip-out { animation: ss-chip-out 0.4s ease-in  forwards; }
+.ss-chip-in  { animation: ss-chip-in  0.5s ease-out forwards; }
+
+/* Track pulse — mono label flashes when state changes */
+@keyframes ss-track-pulse {
+  0%   { letter-spacing: 0.18em; color: var(--ss-cream-muted); }
+  40%  { letter-spacing: 0.32em; color: var(--ss-rose); }
+  100% { letter-spacing: 0.18em; color: var(--ss-cream-muted); }
+}
+.ss-track-pulse { animation: ss-track-pulse 0.9s ease-out; }
+
+/* Haptic bump — for "yes." headline land. Subtle vertical micro-shake. */
+@keyframes ss-haptic-bump {
+  0%, 100% { transform: translateY(0); }
+  45%      { transform: translateY(-4px); }
+  70%      { transform: translateY(2px); }
+}
+.ss-haptic-bump { animation: ss-haptic-bump 0.3s ease-out 0.85s; }
+
+/* Tab pop — bottom nav active state */
+@keyframes ss-tab-pop {
+  0%   { transform: scale(0.8); }
+  50%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.ss-tab-pop { animation: ss-tab-pop 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* Reduced motion — honor the user's preference */
+@media (prefers-reduced-motion: reduce) {
+  .ss-breathe, .ss-pulse-quiet, .ss-pulse-pending, .ss-pulse-lit, .ss-pulse-hot,
+  .ss-pulse-sweep, .ss-pulse-sync-you, .ss-pulse-sync-partner, .ss-dot-pulse, .ss-wave-drift,
+  .ss-fade-up, .ss-word-land, .ss-rose-bloom, .ss-chip-land, .ss-notif-in,
+  .ss-match-strike, .ss-send-flight, .ss-chip-out, .ss-chip-in, .ss-track-pulse,
+  .ss-haptic-bump, .ss-tab-pop {
+    animation: none !important;
+    transition: none !important;
+  }
+  /* still apply final state for entry animations */
+  .ss-fade-up, .ss-word-land, .ss-chip-land, .ss-notif-in { opacity: 1; transform: none; }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "sexualsync-selfhost",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-host (Node) runtime for Sexualsync. Runs the same Cloudflare Pages handlers behind filesystem adapters. Not used by the Cloudflare production deploy.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "serve": "node server.mjs",
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {}
+}

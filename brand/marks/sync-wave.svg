@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Sexualsync">
+  <title>Sexualsync · Sync Wave</title>
+  <path d="M 12,50 C 22,30 38,30 50,50 C 62,70 78,70 88,50" fill="none" stroke="#e9a8b3" stroke-width="3.5" stroke-linecap="round"></path>
+  <path d="M 12,62 C 22,42 38,42 50,62 C 62,82 78,82 88,62" fill="none" stroke="#e9a8b3" stroke-width="3.5" stroke-linecap="round" opacity="0.45"></path>
+</svg>

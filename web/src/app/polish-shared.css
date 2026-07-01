@@ -1,0 +1,331 @@
+/* ───────────────────────────────────────────────────────────────
+   Sexualsync polish system — shared tokens + atmosphere + chrome.
+   Every surface (.surface) inside the design canvas inherits these.
+   ─────────────────────────────────────────────────────────────── */
+
+.surface {
+  /* palette */
+  --bg:           #170a10;
+  --bg-tilt:      #1c0c14;
+  --surface:      #23111a;
+  --surface-2:    #2c1622;
+  --surface-3:    #341a28;
+  --hairline:        rgba(243, 220, 217, 0.08);
+  /* Values match brand-tokens.css (canonical source of truth). */
+  --hairline-strong: rgba(243, 220, 217, 0.14);
+  --cream:        #f3dcd9;
+  --cream-muted:  rgba(243, 220, 217, 0.65);
+  /* Small-text token (eyebrows, faint labels). Raised from 0.32 (~2.4:1,
+     fails WCAG AA) to 0.6 -> >=5.2:1 on every dark surface. Keep in sync
+     with globals.css :root. */
+  --cream-faint:  rgba(243, 220, 217, 0.6);
+  --cream-ghost:  rgba(243, 220, 217, 0.18);
+  --ink:          #170a10;
+
+  /* v1 accent ramp: wine-dark surfaces with rose as the emotional color. */
+  --accent-cool:  #f3dcd9;
+  --accent:       #e9a8b3;
+  --accent-warm:  #d39ba9;
+  --accent-fog:   rgba(233, 168, 179, 0.28);
+  --accent-mist:  rgba(233, 168, 179, 0.12);
+  --accent-deep:  #b87989;
+
+  /* a single "gold" accent for the Blind Reveal — restraint */
+  --gold:         #d9a441;
+
+  /* easing tokens */
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-press:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bloom:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit:   cubic-bezier(0.4, 0, 1, 1);
+
+  /* duration tokens */
+  --dur-tap:     120ms;
+  --dur-release: 320ms;
+  --dur-state:   320ms;
+  --dur-route:   520ms;
+  --dur-bloom:   720ms;
+  --dur-breath:  4800ms;
+
+  /* radius scale */
+  --r-xs:   8px;
+  --r-sm:   12px;
+  --r-md:   16px;
+  --r-lg:   20px;
+  --r-xl:   20px;
+  --r-pill: 999px;
+
+  /* type */
+  --display: var(--font-display), 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  --body:    var(--font-sans), 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:    var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
+
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--cream);
+  font-family: var(--body);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.surface *, .surface *::before, .surface *::after { box-sizing: border-box; }
+
+/* ───── atmosphere ─────────────────────────────────────────────── */
+.atmosphere {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  overflow: hidden;
+}
+.atm-top {
+  position: absolute; top: -20%; left: -20%; right: -20%; height: 60%;
+  background: radial-gradient(ellipse at 50% 0%,
+    rgba(212, 130, 138, 0.22) 0%,
+    rgba(184, 121, 137, 0.08) 32%,
+    transparent 65%);
+  filter: blur(8px);
+}
+.atm-bottom {
+  position: absolute; bottom: -20%; left: -20%; right: -20%; height: 50%;
+  background: radial-gradient(ellipse at 50% 100%,
+    rgba(140, 60, 80, 0.18) 0%,
+    transparent 60%);
+  filter: blur(10px);
+}
+.grain {
+  position: absolute; inset: 0;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Living atmosphere — the warm blooms drift on a long, slow cycle so the
+   wine-black is never dead air on any screen (the sign-in candle breathes;
+   this carries that life app-wide). Both blooms are oversized and clipped by
+   .atmosphere{overflow:hidden}, so the drift never reveals an edge.
+   Transform-only → compositor-cheap. */
+.atm-top {
+  animation: atm-drift-top 28s ease-in-out infinite alternate;
+}
+.atm-bottom {
+  animation: atm-drift-bottom 34s ease-in-out infinite alternate;
+}
+@keyframes atm-drift-top {
+  from { transform: translate3d(-2%, 0, 0) scale(1); }
+  to   { transform: translate3d(3%, 1.6%, 0) scale(1.08); }
+}
+@keyframes atm-drift-bottom {
+  from { transform: translate3d(2%, 0, 0) scale(1.05); }
+  to   { transform: translate3d(-3%, -1.2%, 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atm-top,
+  .atm-bottom {
+    animation: none;
+  }
+}
+
+/* ───── shared chrome — sheet header + done pill ───────────────── */
+.sheet-header {
+  position: relative; z-index: 5;
+  padding: max(60px, calc(28px + var(--safe-area-top))) 22px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--hairline);
+}
+/* Opt-in: pull a sheet's header up to sit near the top instead of a third of
+   the way down. The shared base above keeps the gate-required Dynamic Island
+   inset (check:pwa); this override is a separate selector so the gate's base
+   assertion is untouched, and AppShell's .app-shell-main already insets the
+   column by safe-area-top so the island stays cleared. Mirrors .kd-header
+   (kink detail), generalized for any sheet route that opts in. */
+.sheet-header.sheet-flush {
+  padding-top: 14px;
+}
+.sheet-header-left {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--cream);
+}
+.sheet-title {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--cream);
+  white-space: nowrap;
+}
+.done-pill {
+  appearance: none;
+  background: transparent;
+  color: var(--cream);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background-clip: padding-box;
+  box-shadow: var(--ring-hairline-strong, inset 0 0 0 1px var(--hairline-strong));
+  padding: 8px 18px;
+  font-family: var(--body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--dur-state) var(--ease-settle), transform var(--dur-tap) ease-out;
+}
+.done-pill:active { transform: scale(0.97); }
+.done-pill:hover { background: rgba(243, 220, 217, 0.04); }
+
+/* ───── infinity ribbon ────────────────────────────────────────── */
+.infinity {
+  color: var(--accent);
+  display: block;
+}
+.infinity.is-breathing path {
+  animation: ribbon-breath 6.4s ease-in-out infinite alternate;
+  transform-origin: 50px 25px;
+}
+@keyframes ribbon-breath {
+  0%   { opacity: 0.78; transform: scale(0.995); }
+  100% { opacity: 1;    transform: scale(1.012); }
+}
+
+/* ───── eyebrow label (mono caps) ──────────────────────────────── */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+  font-weight: 500;
+}
+.eyebrow em {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ───── headlines ──────────────────────────────────────────────── */
+.h-section {
+  font-family: var(--display);
+  font-style: normal;
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--cream);
+}
+.h-intimate {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+  color: var(--cream);
+  text-wrap: pretty;
+}
+.h-quiet {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  color: var(--cream-muted);
+}
+
+/* ───── press response — universal ─────────────────────────────── */
+.pressable {
+  transition:
+    transform var(--dur-tap) var(--ease-exit),
+    background var(--dur-state) var(--ease-settle),
+    border-color var(--dur-state) var(--ease-settle),
+    box-shadow var(--dur-state) var(--ease-settle);
+  /* No `will-change: transform` here: `.pressable` is on every button/tab, so a
+     permanent compositing hint per button bloats GPU layer memory on low-end
+     Android. The `:active` scale composites fine on demand without the hint. */
+}
+.pressable:active { transform: scale(0.97); }
+.pressable:not(:active) {
+  transition:
+    transform var(--dur-release) var(--ease-press),
+    background var(--dur-state) var(--ease-settle),
+    border-color var(--dur-state) var(--ease-settle),
+    box-shadow var(--dur-state) var(--ease-settle);
+}
+
+/* ───── on-screen keyboard handling ─────────────────────────────────
+   PwaBridge tracks visualViewport and sets --kb-inset (the keyboard height)
+   plus [data-kb="1"] on <html> while the keyboard is up. Lift the floating
+   primary action above the keyboard; slide the tab bar fully out so it doesn't
+   wedge between the input and the keyboard. Loaded after globals.css, so these
+   win the cascade over the base .tabbar / .sticky-action rules. */
+.sticky-action {
+  transform: translateY(calc(-1 * var(--kb-inset, 0px)));
+}
+:root[data-kb="1"] .tabbar {
+  transform: translateY(100%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sticky-action,
+  :root[data-kb="1"] .tabbar {
+    transition: transform 180ms var(--ease-settle, ease);
+  }
+}
+
+/* ───── primary CTA ────────────────────────────────────────────── */
+.cta-primary {
+  appearance: none;
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--ink);
+  border: none;
+  font-family: var(--body);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  box-shadow: 0 8px 24px var(--accent-fog), inset 0 1px 0 rgba(255,255,255,0.16);
+}
+.cta-primary[disabled] {
+  background: rgba(243, 220, 217, 0.08);
+  color: var(--cream-faint);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.cta-secondary {
+  appearance: none;
+  width: 100%;
+  padding: 15px 24px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--cream);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  box-shadow: var(--ring-hairline-strong, inset 0 0 0 1px var(--hairline-strong));
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ───── status pill ────────────────────────────────────────────── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--body);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cream-muted);
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(243, 220, 217, 0.04);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  box-shadow: var(--ring-hairline, inset 0 0 0 1px var(--hairline));
+}
+.status-pill .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-fog);
+}

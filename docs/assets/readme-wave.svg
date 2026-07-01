@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
+  <title id="title">Sexualsync animated wave mark</title>
+  <desc id="desc">A premium dark plum Sexualsync banner with two animated rose wave marks.</desc>
+  <defs>
+    <radialGradient id="rose-glow" cx="50%" cy="48%" r="56%">
+      <stop offset="0%" stop-color="#e9a8b3" stop-opacity="0.36"/>
+      <stop offset="42%" stop-color="#b87989" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#170a10" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="plum" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#25111b"/>
+      <stop offset="52%" stop-color="#170a10"/>
+      <stop offset="100%" stop-color="#0d0509"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#050204" flood-opacity="0.55"/>
+    </filter>
+    <filter id="wave-glow" x="-40%" y="-80%" width="180%" height="260%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      .card { filter: url(#soft-shadow); }
+      .aura { animation: breathe 5.6s ease-in-out infinite; transform-origin: 480px 170px; }
+      .wave { fill: none; stroke: #e9a8b3; stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; filter: url(#wave-glow); stroke-dasharray: 760; stroke-dashoffset: 760; animation: draw 2.4s cubic-bezier(.22,1,.36,1) .15s forwards, pulse 5s ease-in-out 2.2s infinite; transform-origin: 480px 170px; }
+      .wave.back { stroke: rgba(233,168,179,.34); stroke-width: 5; animation-delay: .35s, 2.2s; }
+      .sweep { fill: none; stroke: #f3dcd9; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 70 760; stroke-dashoffset: 760; opacity: 0; filter: url(#wave-glow); animation: sweep 3.6s cubic-bezier(.4,0,.6,1) 2.4s infinite; }
+      .spark { fill: #f3dcd9; opacity: 0; animation: spark 3.8s ease-in-out infinite; transform-origin: center; }
+      .spark.b { animation-delay: .42s; }
+      .spark.c { animation-delay: .78s; }
+      .eyebrow { font: 500 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .38em; fill: #d9a441; opacity: .78; }
+      .word { font: italic 500 78px/1 Georgia, "Times New Roman", serif; letter-spacing: -1px; }
+      .muted { fill: rgba(243,220,217,.62); font: 400 19px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      @keyframes draw { to { stroke-dashoffset: 0; } }
+      @keyframes pulse { 0%, 100% { transform: scaleY(.94); } 50% { transform: scaleY(1.08); } }
+      @keyframes breathe { 0%, 100% { opacity: .72; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.05); } }
+      @keyframes sweep { 0% { stroke-dashoffset: 760; opacity: 0; } 14% { opacity: .95; } 82% { opacity: .95; } 100% { stroke-dashoffset: -70; opacity: 0; } }
+      @keyframes spark { 0%, 100% { opacity: 0; transform: scale(.5) translateY(0); } 24% { opacity: .82; transform: scale(1) translateY(-2px); } 58% { opacity: 0; transform: scale(.5) translateY(-12px); } }
+      @media (prefers-reduced-motion: reduce) {
+        .aura, .wave, .sweep, .spark { animation: none; }
+        .wave { stroke-dashoffset: 0; }
+        .sweep, .spark { display: none; }
+      }
+    </style>
+  </defs>
+
+  <rect width="960" height="360" rx="34" fill="url(#plum)" class="card"/>
+  <rect x="1" y="1" width="958" height="358" rx="33" fill="none" stroke="rgba(243,220,217,.10)"/>
+  <circle class="aura" cx="480" cy="164" r="150" fill="url(#rose-glow)"/>
+
+  <g transform="translate(0 6)">
+    <path class="wave back" d="M250 126 C320 44 410 44 480 126 C550 208 640 208 710 126"/>
+    <path class="wave" d="M250 126 C320 44 410 44 480 126 C550 208 640 208 710 126"/>
+    <path class="sweep" d="M250 126 C320 44 410 44 480 126 C550 208 640 208 710 126"/>
+
+    <path class="wave back" d="M250 190 C320 108 410 108 480 190 C550 272 640 272 710 190"/>
+    <path class="wave" d="M250 190 C320 108 410 108 480 190 C550 272 640 272 710 190"/>
+    <path class="sweep" d="M250 190 C320 108 410 108 480 190 C550 272 640 272 710 190"/>
+
+    <circle class="spark" cx="480" cy="72" r="3.2"/>
+    <circle class="spark b" cx="374" cy="158" r="2.6"/>
+    <circle class="spark c" cx="586" cy="230" r="2.6"/>
+  </g>
+
+  <text x="480" y="286" text-anchor="middle" class="eyebrow">PRIVATE ROOM FOR TWO</text>
+  <text x="480" y="326" text-anchor="middle" class="muted">Get Curious. Get in Sync</text>
+</svg>

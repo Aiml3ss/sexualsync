@@ -1,0 +1,92 @@
+/* ============================================================================
+   Sexualsync · brand tokens
+   Source of truth for colors, type, radii, and elevation across the app.
+   Generated from the design system finalized in May 2026.
+   ============================================================================ */
+
+:root {
+  /* ---------- Surfaces (dark theme — the only theme) ---------- */
+  --ss-bg:           #170a10;   /* canvas / page background */
+  --ss-surface:      #23111a;   /* card / panel */
+  --ss-surface-2:    #2c1622;   /* raised card */
+  --ss-surface-3:    #341a28;   /* deepest nested surface */
+
+  /* ---------- Hairlines (use over surfaces) ---------- */
+  --ss-hairline:        rgba(243, 220, 217, 0.08);
+  --ss-hairline-strong: rgba(243, 220, 217, 0.14);
+
+  /* ---------- Accent — rose ramp ---------- */
+  --ss-rose:      #e9a8b3;   /* primary accent: CTAs, "sync", live state */
+  --ss-rose-soft: #d39ba9;   /* secondary accent */
+  --ss-rose-deep: #b87989;   /* pressed accent · "they want your take" */
+  --ss-rose-fog:  rgba(233, 168, 179, 0.18);   /* glow / shadow */
+  --accent:       var(--ss-rose);
+  --accent-fog:   var(--ss-rose-fog);
+
+  /* ---------- Text ---------- */
+  --ss-cream:        #f3dcd9;                       /* primary text on dark */
+  --ss-cream-muted:  rgba(243, 220, 217, 0.65);     /* body copy */
+  --ss-cream-faint:  rgba(243, 220, 217, 0.32);     /* captions, disabled */
+  --ss-ink:          #170a10;                       /* text on rose accent */
+  --cream:           var(--ss-cream);
+
+  /* ---------- Semantic ramp — app state ----------
+     Six tuned hues for status. Each picked at roughly the same lightness as
+     rose so they read as siblings. Bans bespoke greens, ambers, or reds. */
+  --ss-yes:         #a8c9a0;   --ss-yes-fog:      rgba(168, 201, 160, 0.18);
+  --ss-counter:     #d4a574;   --ss-counter-fog:  rgba(212, 165, 116, 0.18);
+  --ss-pending:     #c4a4a8;   --ss-pending-fog:  rgba(196, 164, 168, 0.18);
+  --ss-tell:        #b87989;   --ss-tell-fog:     rgba(184, 121, 137, 0.20);
+  --ss-declined:    #c98a82;   --ss-declined-fog: rgba(201, 138, 130, 0.18);
+  --ss-soft-no:     rgba(243, 220, 217, 0.45);
+
+  /* ---------- Typography ---------- */
+  --ss-font-display: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+  --ss-font-body:    "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --ss-font-mono:    "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  /* type scale — body */
+  --ss-text-xs:      11px;
+  --ss-text-sm:      13px;
+  --ss-text-base:    14px;
+  --ss-text-md:      15px;
+  --ss-text-lg:      16px;
+
+  /* type scale — display (italic by default, override per use) */
+  --ss-display-xs:   18px;
+  --ss-display-sm:   22px;
+  --ss-display-md:   26px;
+  --ss-display-lg:   32px;
+  --ss-display-xl:   42px;     /* landing hero */
+  --ss-display-2xl:  72px;     /* magic moments medium */
+  --ss-display-3xl:  128px;    /* "yes." */
+
+  /* mono — labels */
+  --ss-mono-size:        10px;
+  --ss-mono-size-sm:     9.5px;
+  --ss-mono-tracking:    0.18em;
+  --ss-mono-tracking-tight: 0.16em;
+
+  /* ---------- Spacing ---------- */
+  --ss-space-1:      4px;
+  --ss-space-2:      8px;
+  --ss-space-3:      12px;
+  --ss-space-4:      16px;
+  --ss-space-5:      20px;
+  --ss-space-6:      24px;
+  --ss-space-7:      28px;
+  --ss-space-8:      32px;
+
+  /* ---------- Radii ---------- */
+  --ss-radius-sm:    8px;
+  --ss-radius-md:    12px;
+  --ss-radius-lg:    16px;
+  --ss-radius-xl:    20px;
+  --ss-radius-pill:  999px;
+
+  /* ---------- Elevation ---------- */
+  --ss-glow-rose:        0 0 32px var(--ss-rose-fog);
+  --ss-glow-rose-strong: 0 0 60px var(--ss-rose-fog);
+  --ss-shadow-card:      0 2px 12px rgba(0,0,0,0.25);
+  --ss-shadow-floating:  0 8px 28px rgba(0,0,0,0.35);
+}

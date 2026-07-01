@@ -1,0 +1,308 @@
+@import url("/brand/tokens/animations.css");
+
+:root {
+  color-scheme: dark;
+  font-family: var(--ss-font-body);
+  background: var(--ss-bg);
+  color: var(--ss-cream);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ss-surface-2) 68%, transparent) 0, transparent 340px),
+    linear-gradient(135deg, color-mix(in srgb, var(--ss-rose) 8%, transparent), transparent 46%),
+    var(--ss-bg);
+  color: var(--ss-cream);
+  font-family: var(--ss-font-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--ss-rose);
+  text-decoration: none;
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--ss-cream);
+}
+
+.legal-shell {
+  width: min(900px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 64px;
+}
+
+.legal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.legal-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ss-cream);
+  min-height: 44px;
+}
+
+.brand-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1;
+}
+
+.brand-mark {
+  display: block;
+  color: var(--accent);
+  filter: drop-shadow(0 0 8px var(--accent-fog));
+  flex: 0 0 auto;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.brand-mark path {
+  animation: ribbon-breath 6.4s ease-in-out infinite alternate;
+  transform-origin: 50px 25px;
+}
+
+.brand-word {
+  color: var(--cream);
+  font-family: "Cormorant Garamond", var(--ss-font-display), serif;
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.brand-dot + .brand-word {
+  color: var(--accent);
+}
+
+.brand-dot {
+  width: 5px;
+  height: 5px;
+  margin: 0 2px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-fog);
+}
+
+.legal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-family: var(--ss-font-mono);
+  font-size: var(--ss-text-xs);
+  letter-spacing: var(--ss-mono-tracking-tight);
+  text-transform: uppercase;
+}
+
+.legal-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ss-hairline);
+  border-radius: var(--ss-radius-pill);
+  background: rgba(243, 220, 217, 0.035);
+  color: var(--ss-cream-muted);
+}
+
+.legal-nav a:hover,
+.legal-nav a:focus-visible {
+  border-color: color-mix(in srgb, var(--ss-rose) 32%, transparent);
+  background: color-mix(in srgb, var(--ss-rose) 10%, transparent);
+  color: var(--ss-cream);
+}
+
+.legal-hero {
+  margin-bottom: 18px;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, var(--ss-rose) 28%, transparent);
+  border-radius: var(--ss-radius-lg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ss-rose) 8%, transparent), transparent),
+    rgba(243, 220, 217, 0.03);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ss-cream) 5%, transparent);
+}
+
+.legal-eyebrow {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--ss-rose);
+  font-family: var(--ss-font-mono);
+  font-size: var(--ss-text-xs);
+  letter-spacing: var(--ss-mono-tracking);
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  color: var(--ss-cream);
+  font-family: var(--ss-font-display);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+h1 {
+  max-width: 760px;
+  font-size: clamp(38px, 8vw, 60px);
+  line-height: 1;
+}
+
+.legal-lede {
+  max-width: 720px;
+  margin: 18px 0 0;
+  color: var(--ss-cream-muted);
+  font-size: var(--ss-text-lg);
+}
+
+.legal-meta {
+  margin: 18px 0 0;
+  color: var(--ss-cream-faint);
+  font-family: var(--ss-font-mono);
+  font-size: var(--ss-text-xs);
+  letter-spacing: var(--ss-mono-tracking-tight);
+  text-transform: uppercase;
+}
+
+.legal-section {
+  display: grid;
+  gap: 12px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--ss-hairline);
+}
+
+.legal-section h2 {
+  font-size: clamp(24px, 4vw, 34px);
+  line-height: 1.05;
+}
+
+.legal-section h3 {
+  margin-top: 8px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.legal-section p,
+.legal-section li {
+  max-width: 760px;
+  color: var(--ss-cream-muted);
+  font-size: var(--ss-text-md);
+}
+
+.legal-section p {
+  margin: 0;
+}
+
+.legal-section ul,
+.legal-section ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.legal-callout {
+  max-width: 760px;
+  padding: 16px 18px;
+  border: 1px solid var(--ss-hairline-strong);
+  border-radius: var(--ss-radius-sm);
+  background: color-mix(in srgb, var(--ss-surface) 82%, transparent);
+  color: var(--ss-cream);
+}
+
+.legal-callout p,
+.legal-callout li {
+  color: var(--ss-cream);
+}
+
+.legal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.legal-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--ss-hairline-strong);
+  border-radius: var(--ss-radius-pill);
+  background: var(--ss-rose);
+  color: var(--ss-ink);
+  font-weight: 700;
+  box-shadow: 0 8px 24px var(--ss-rose-fog), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.legal-button:hover,
+.legal-button:focus-visible {
+  color: var(--ss-ink);
+  background: var(--ss-rose-soft);
+}
+
+.legal-button--ghost {
+  background: transparent;
+  color: var(--ss-cream-muted);
+}
+
+.legal-button--ghost:hover,
+.legal-button--ghost:focus-visible {
+  color: var(--ss-cream);
+  background: var(--ss-surface);
+}
+
+.legal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 24px;
+  border-top: 1px solid var(--ss-hairline);
+  color: var(--ss-cream-faint);
+  font-size: var(--ss-text-sm);
+}
+
+@media (max-width: 640px) {
+  .legal-shell {
+    width: min(100% - 28px, 920px);
+    padding-top: max(20px, env(safe-area-inset-top));
+  }
+
+  .legal-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-bottom: 22px;
+  }
+
+  .legal-nav {
+    justify-content: flex-start;
+  }
+
+  .legal-hero {
+    padding: 18px;
+  }
+}

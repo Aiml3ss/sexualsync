@@ -1,0 +1,467 @@
+/* Lock overlay — sits above the entire app when locked. */
+
+.app-lock-gate-holding {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 9998;
+}
+
+.lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  color: var(--cream);
+  display: grid;
+  place-items: center;
+  padding: max(40px, calc(20px + var(--safe-area-top))) 22px max(36px, calc(20px + var(--safe-area-bottom)));
+  overflow: hidden;
+}
+
+.lock-overlay-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lock-overlay-bloom {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 60%;
+  background: radial-gradient(60% 50% at 50% 30%, rgba(233,168,179,0.18), transparent 70%);
+  filter: blur(40px);
+}
+
+.lock-overlay-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.06;
+  background-image:
+    repeating-radial-gradient(circle at 25% 25%, rgba(243,220,217,0.4) 0, rgba(243,220,217,0.4) 0.5px, transparent 0.5px, transparent 2px),
+    repeating-radial-gradient(circle at 75% 65%, rgba(243,220,217,0.3) 0, rgba(243,220,217,0.3) 0.5px, transparent 0.5px, transparent 2.5px);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.lock-overlay-card {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.lock-overlay-title {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 36px;
+  line-height: 1.05;
+  margin: 0 0 8px;
+}
+
+.lock-overlay-sub {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--cream-muted);
+  margin: 0 0 18px;
+}
+
+.lock-overlay-error {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 138, 130, 0.4);
+  background: rgba(201, 138, 130, 0.12);
+  color: var(--no);
+  font-family: var(--body);
+  font-size: 13px;
+  width: 100%;
+  text-align: center;
+}
+
+.lock-overlay-cta {
+  min-width: 200px;
+  padding: 13px 22px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--ink);
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px var(--accent-fog), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+.lock-overlay-cta:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.lock-overlay-passphrase {
+  width: 100%;
+  margin: 12px 0 14px;
+  text-align: center;
+}
+
+/* ============================================================================
+   ROOM LOCKED — premium edition
+   These `.lock-overlay*` base styles and the `.lock-overlay-room` scope below
+   are now used only by RoomEncryptionGate (the room E2EE unlock screen). The
+   per-device PIN lock that originally shared them was removed. Reuses the
+   sign-in brand language: animated stacked-wave mark, parallax tilt,
+   aura/bloom, light-sweep and sparks. Self-contained keyframes (lock-*).
+   ============================================================================ */
+
+.lock-overlay-room {
+  background:
+    radial-gradient(120% 80% at 50% 18%, rgba(233, 168, 179, 0.10), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 50%, #1f0d16 0%, transparent 70%),
+    var(--bg);
+  perspective: 1000px;
+}
+
+.lock-overlay-room .lock-overlay-bloom {
+  inset: -28% -10% auto -10%;
+  height: 66%;
+  background: radial-gradient(58% 52% at 50% 28%, rgba(233, 168, 179, 0.26), transparent 72%);
+  filter: blur(46px);
+  animation: lock-bg-breath 7.2s ease-in-out infinite alternate;
+}
+
+@keyframes lock-bg-breath {
+  0%   { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.lock-overlay-room .lock-overlay-card {
+  gap: 0;
+}
+
+/* ── BRAND HERO — animated stacked-wave mark ───────────────────────────── */
+.lock-hero {
+  --tx: 0;
+  --ty: 0;
+  position: relative;
+  width: 184px;
+  height: 184px;
+  margin: 0 0 10px;
+  transform-style: preserve-3d;
+}
+
+.lock-hero-tilt {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform: rotateY(calc(var(--tx, 0) * 7deg)) rotateX(calc(var(--ty, 0) * -5deg));
+  transition: transform 80ms linear;
+}
+
+.lock-hero-aura {
+  position: absolute;
+  inset: -34px;
+  background: radial-gradient(
+    ellipse 58% 52% at calc(50% + var(--tx, 0) * 16%) calc(50% + var(--ty, 0) * 12%),
+    var(--accent-fog), transparent 66%
+  );
+  pointer-events: none;
+}
+
+.lock-hero-bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 230px;
+  height: 230px;
+  transform: translate(-50%, -50%) scale(0.2);
+  background: radial-gradient(
+    circle,
+    rgba(233, 168, 179, 0.5) 0%,
+    rgba(233, 168, 179, 0.14) 42%,
+    transparent 70%
+  );
+  filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  animation: lock-bloom 2.6s var(--ease-bloom, cubic-bezier(0.16, 1, 0.3, 1)) 0.2s forwards;
+}
+
+@keyframes lock-bloom {
+  0%   { opacity: 0;    transform: translate(-50%, -50%) scale(0.2); }
+  45%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0.7;  transform: translate(-50%, -50%) scale(1); }
+}
+
+.lock-hero-pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150px;
+  height: 150px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(233, 168, 179, 0.16), transparent 62%);
+  opacity: 0;
+  pointer-events: none;
+  animation: lock-pulse 4.8s ease-in-out 1.8s infinite;
+}
+
+@keyframes lock-pulse {
+  0%, 100% { opacity: 0.28; transform: translate(-50%, -50%) scale(0.92); }
+  50%      { opacity: 0.6;  transform: translate(-50%, -50%) scale(1.08); }
+}
+
+.lock-hero-svg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+/* sealed ring — draws on, then holds with a soft glow */
+.lock-hero-ring-ghost {
+  fill: none;
+  stroke: var(--hairline-strong);
+  stroke-width: 1;
+}
+
+.lock-hero-ring {
+  --L: 600;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-dasharray: var(--L);
+  stroke-dashoffset: var(--L);
+  opacity: 0.82;
+  transform-origin: 100px 100px;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 0 8px var(--accent-fog));
+  animation:
+    lock-draw 1.4s var(--ease-settle, cubic-bezier(0.22, 1, 0.36, 1)) 0.15s forwards,
+    lock-ring-glow 5.2s ease-in-out 2s infinite;
+}
+
+@keyframes lock-ring-glow {
+  0%, 100% { opacity: 0.62; filter: drop-shadow(0 0 6px var(--accent-fog)); }
+  50%      { opacity: 1;    filter: drop-shadow(0 0 16px var(--accent-fog)); }
+}
+
+/* stacked brand waves — identical timing, perfect lockstep */
+.lock-hero-wave-back,
+.lock-hero-wave {
+  --L: 600;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: var(--L);
+  stroke-dashoffset: var(--L);
+  transform-origin: 100px 106px;
+}
+
+.lock-hero-wave {
+  stroke: var(--accent);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 12px rgba(233, 168, 179, 0.55));
+  animation:
+    lock-draw 1.2s var(--ease-settle, cubic-bezier(0.22, 1, 0.36, 1)) 0.5s forwards,
+    lock-wave-breath 5s ease-in-out 2.2s infinite;
+}
+
+.lock-hero-wave-back {
+  stroke: rgba(233, 168, 179, 0.34);
+  stroke-width: 2.6;
+  opacity: 0.7;
+  animation:
+    lock-draw 1.4s var(--ease-settle, cubic-bezier(0.22, 1, 0.36, 1)) 0.35s forwards,
+    lock-wave-breath 5s ease-in-out 2.2s infinite;
+}
+
+@keyframes lock-draw { to { stroke-dashoffset: 0; } }
+
+@keyframes lock-wave-breath {
+  0%, 100% { transform: scaleY(0.94); }
+  50%      { transform: scaleY(1.1); }
+}
+
+/* light-sweep races across the wave on a loop */
+.lock-hero-sweep {
+  fill: none;
+  stroke: var(--cream);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-dasharray: 26 240;
+  stroke-dashoffset: 266;
+  opacity: 0;
+  filter: drop-shadow(0 0 8px rgba(243, 220, 217, 0.9));
+  animation: lock-sweep 3.6s cubic-bezier(0.4, 0, 0.6, 1) 2.6s infinite;
+}
+
+@keyframes lock-sweep {
+  0%   { stroke-dashoffset: 266; opacity: 0; }
+  16%  { opacity: 0.95; }
+  82%  { opacity: 0.95; }
+  100% { stroke-dashoffset: -26; opacity: 0; }
+}
+
+/* floating sparks */
+.lock-hero-spark { fill: var(--cream); opacity: 0; }
+.lock-hero-spark.a { animation: lock-spark 3.6s ease-in-out 3s infinite; }
+.lock-hero-spark.b { animation: lock-spark 4.1s ease-in-out 3.4s infinite; }
+.lock-hero-spark.c { animation: lock-spark 3.2s ease-in-out 3.8s infinite; }
+
+@keyframes lock-spark {
+  0%   { opacity: 0;    transform: scale(0.4); }
+  20%  { opacity: 0.85; transform: scale(1); }
+  60%  { opacity: 0;    transform: scale(0.4) translateY(-8px); }
+  100% { opacity: 0; }
+}
+
+/* ── COPY — staggered entrance ─────────────────────────────────────────── */
+.lock-overlay-room .lock-overlay-title {
+  font-size: 40px;
+  letter-spacing: -0.012em;
+  margin: 0 0 10px;
+}
+
+.lock-overlay-room .lock-overlay-title .word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(16px) scale(0.94);
+  filter: blur(4px);
+  animation: lock-word-land 0.9s var(--ease-bloom, cubic-bezier(0.16, 1, 0.3, 1)) forwards;
+}
+.lock-overlay-room .lock-overlay-title .word:nth-child(1) { animation-delay: 0.5s; }
+.lock-overlay-room .lock-overlay-title .word:nth-child(2) { animation-delay: 0.62s; }
+
+@keyframes lock-word-land {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.94); filter: blur(4px); }
+  55%  { opacity: 1; transform: translateY(-3px) scale(1.02); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0)   scale(1);    filter: blur(0); }
+}
+
+.lock-overlay-room .lock-overlay-sub {
+  max-width: 30ch;
+  line-height: 1.5;
+  margin: 0 0 20px;
+  opacity: 0;
+  animation: lock-fade-up 0.7s ease-out 1s forwards;
+}
+
+@keyframes lock-fade-up {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ── PASSPHRASE — premium focus ────────────────────────────────────────── */
+.lock-overlay-room .lock-overlay-passphrase {
+  min-height: 52px;
+  border-radius: 14px;
+  letter-spacing: 0.02em;
+  margin: 0 0 12px;
+  opacity: 0;
+  transition: box-shadow 200ms ease, border-color 200ms ease, background 200ms ease;
+  animation: lock-fade-up 0.7s ease-out 1.2s forwards;
+}
+.lock-overlay-room .lock-overlay-passphrase:focus,
+.lock-overlay-room .lock-overlay-passphrase:focus-visible {
+  outline: none;
+  border-color: var(--accent-fog);
+  box-shadow: 0 0 0 3px var(--accent-mist), 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+/* ── CTA — accent pill with hover bloom ────────────────────────────────── */
+.lock-overlay-room .lock-overlay-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 52px;
+  overflow: hidden;
+  opacity: 0;
+  transition: transform 90ms ease, box-shadow 220ms ease, opacity 0.7s ease;
+  animation: lock-fade-up 0.7s ease-out 1.35s forwards;
+}
+.lock-overlay-room .lock-overlay-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.34), transparent 60%);
+  opacity: 0;
+  transition: opacity 240ms ease-out;
+  pointer-events: none;
+}
+.lock-overlay-room .lock-overlay-cta:hover:not(:disabled)::before { opacity: 1; }
+.lock-overlay-room .lock-overlay-cta:hover:not(:disabled) {
+  box-shadow: 0 12px 32px var(--accent-fog), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+.lock-overlay-room .lock-overlay-cta:active:not(:disabled) { transform: scale(0.985); }
+.lock-overlay-room .lock-overlay-cta-glyph { flex: 0 0 auto; opacity: 0.9; }
+.lock-overlay-room .lock-overlay-cta span { position: relative; }
+
+.lock-overlay-room .lock-overlay-error {
+  margin-top: 14px;
+  animation: lock-fade-up 0.4s ease-out forwards;
+}
+
+/* ── REASSURANCE METER — "· End-to-end encrypted" ──────────────────────── */
+.lock-room-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 22px 0 0;
+  font: 500 9px/1 var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+  opacity: 0;
+  animation: lock-fade-up 0.7s ease-out 1.6s forwards;
+}
+.lock-room-meter .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(233, 168, 179, 0.85);
+  animation: lock-meter-dot 2.6s ease-in-out infinite;
+}
+
+@keyframes lock-meter-dot {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.35); }
+}
+
+/* ── REDUCED MOTION ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .lock-hero-tilt { transform: none !important; }
+  .lock-hero-ring,
+  .lock-hero-wave,
+  .lock-hero-wave-back {
+    stroke-dashoffset: 0 !important;
+    transform: none !important;
+  }
+  .lock-hero-ring { animation: none !important; opacity: 0.6; }
+  .lock-hero-wave,
+  .lock-hero-wave-back { animation: none !important; }
+  .lock-hero-bloom { animation: none !important; opacity: 0.55; }
+  .lock-hero-pulse { animation: none !important; opacity: 0.35; }
+  .lock-hero-sweep,
+  .lock-hero-spark { display: none !important; }
+  .lock-overlay-room .lock-overlay-bloom { animation: none !important; }
+  .lock-overlay-room .lock-overlay-title .word,
+  .lock-overlay-room .lock-overlay-sub,
+  .lock-overlay-room .lock-overlay-passphrase,
+  .lock-overlay-room .lock-overlay-cta,
+  .lock-room-meter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .lock-room-meter .dot { animation: none !important; }
+}

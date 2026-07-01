@@ -1,0 +1,630 @@
+/* ───────────────────────────────────────────────────────────────
+   Sign-in mockups (dev-only). Three variants live under
+   /v1-preview/signin-a, -b, -c. Selectors are scoped by variant
+   prefix so they cannot collide with the live signin styles.
+   ─────────────────────────────────────────────────────────────── */
+
+/* ───── preview chrome shared by all three ─────────────────────── */
+.preview-tag {
+  position: fixed;
+  top: max(14px, calc(8px + var(--safe-area-top, 0px)));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  background: rgba(35, 17, 26, 0.78);
+  background-clip: padding-box;
+  box-shadow: var(--ring-hairline-strong, inset 0 0 0 1px var(--hairline-strong));
+  backdrop-filter: blur(10px);
+  color: var(--cream-muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.preview-tag b {
+  color: var(--cream);
+  font-weight: 600;
+}
+
+.preview-switcher {
+  position: relative;
+  z-index: 2;
+  margin-top: 30px;
+  padding: 0 22px 28px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.preview-switcher a {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+  text-decoration: none;
+  padding: 7px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: color var(--dur-state) var(--ease-settle),
+              border-color var(--dur-state) var(--ease-settle),
+              box-shadow var(--dur-state) var(--ease-settle);
+}
+.preview-switcher a:hover {
+  color: var(--cream);
+  border-color: transparent;
+  box-shadow: var(--ring-hairline, inset 0 0 0 1px var(--hairline));
+}
+.preview-switcher a[aria-current="page"] {
+  color: var(--cream);
+  border-color: transparent;
+  box-shadow: var(--ring-hairline-strong, inset 0 0 0 1px var(--hairline-strong));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOCKUP A — Hushed & intimate
+   The breathing ribbon is the emotional center. Cream-on-wine
+   button (no loud multicolor logo). Two-line italic headline.
+   ═══════════════════════════════════════════════════════════════ */
+.pa-stage {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(100dvh - 90px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 22px 28px;
+}
+
+.pa-hero {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  margin-top: -10px;
+}
+.pa-ribbon {
+  width: min(74vw, 320px);
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.pa-copy {
+  margin-top: 30px;
+  text-align: center;
+}
+.pa-eyebrow {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.78;
+  margin: 0 0 14px;
+}
+.pa-headline {
+  margin: 0;
+  font-size: 52px;
+  line-height: 0.96;
+  letter-spacing: -0.01em;
+}
+.pa-headline span {
+  display: block;
+}
+.pa-sub {
+  margin: 18px auto 0;
+  max-width: 30ch;
+  color: var(--cream-muted);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.pa-actions {
+  margin-top: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pa-cta {
+  appearance: none;
+  width: 100%;
+  min-height: 56px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg,
+      rgba(243, 220, 217, 0.07) 0%,
+      rgba(243, 220, 217, 0.02) 100%);
+  background-clip: padding-box;
+  color: var(--cream);
+  font-family: var(--body);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    var(--ring-hairline-strong, inset 0 0 0 1px var(--hairline-strong)),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 14px 30px rgba(0, 0, 0, 0.28);
+  transition: background var(--dur-state) var(--ease-settle),
+              border-color var(--dur-state) var(--ease-settle),
+              transform var(--dur-tap) ease-out;
+}
+.pa-cta:hover {
+  background:
+    linear-gradient(180deg,
+      rgba(243, 220, 217, 0.10) 0%,
+      rgba(243, 220, 217, 0.03) 100%);
+  border-color: transparent;
+  box-shadow:
+    var(--ring-accent-fog, inset 0 0 0 1px var(--accent-fog)),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 14px 30px rgba(0, 0, 0, 0.28);
+}
+.pa-cta:active { transform: scale(0.985); }
+.pa-cta-glyph {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  padding-bottom: 1px;
+}
+
+.pa-foot {
+  margin: 26px 0 0;
+  color: var(--cream-faint);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+.pa-foot a {
+  color: var(--cream-muted);
+  text-decoration: none;
+}
+.pa-foot a:hover { color: var(--cream); }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOCKUP B — Sealed-room / premium
+   Threshold framing. CTA lives inside a hairline card with a
+   warm inner gradient. Gold ornament divider. "Step inside" copy.
+   ═══════════════════════════════════════════════════════════════ */
+.pb-stage {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(100dvh - 90px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 22px 32px;
+}
+
+.pb-eyebrow {
+  display: block;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.82;
+  margin: 0 0 16px;
+}
+.pb-headline {
+  margin: 0;
+  text-align: center;
+  font-size: 46px;
+  line-height: 0.98;
+  letter-spacing: -0.012em;
+}
+.pb-headline span {
+  display: block;
+}
+
+.pb-ornament {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 28px 0 22px;
+  color: var(--gold);
+  opacity: 0.7;
+}
+.pb-ornament i {
+  display: block;
+  flex: 0 0 56px;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(217, 164, 65, 0.46) 50%,
+    transparent 100%);
+}
+.pb-ornament svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+}
+
+.pb-card {
+  position: relative;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-lg);
+  padding: 26px 22px 22px;
+  background:
+    radial-gradient(140% 90% at 50% 0%,
+      rgba(217, 164, 65, 0.08) 0%,
+      transparent 60%),
+    linear-gradient(180deg,
+      rgba(52, 26, 40, 0.72) 0%,
+      rgba(35, 17, 26, 0.62) 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 20px 48px rgba(0, 0, 0, 0.34);
+  text-align: center;
+}
+.pb-card-title {
+  margin: 0 0 10px;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--cream);
+}
+.pb-card-sub {
+  margin: 0 auto 22px;
+  max-width: 30ch;
+  color: var(--cream-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pb-cta {
+  appearance: none;
+  width: 100%;
+  min-height: 52px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.20) inset,
+    0 10px 28px var(--accent-fog);
+  transition: transform var(--dur-tap) ease-out, filter var(--dur-state) var(--ease-settle);
+}
+.pb-cta:hover { filter: brightness(1.04); }
+.pb-cta:active { transform: scale(0.985); }
+.pb-cta-glyph {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--accent);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  padding-bottom: 1px;
+}
+
+.pb-card-divider {
+  display: block;
+  margin: 18px auto 14px;
+  width: 36px;
+  height: 1px;
+  background: var(--hairline-strong);
+  border: 0;
+}
+.pb-ghost {
+  display: inline-block;
+  font-family: var(--body);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--cream-faint);
+  text-decoration: none;
+  padding: 4px 8px;
+  transition: color var(--dur-state) var(--ease-settle);
+}
+.pb-ghost:hover { color: var(--cream-muted); }
+.pb-ghost u {
+  text-decoration: none;
+  border-bottom: 1px solid var(--hairline-strong);
+  padding-bottom: 1px;
+}
+
+.pb-foot {
+  margin: 26px 0 0;
+  text-align: center;
+  color: var(--cream-faint);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+.pb-foot a { color: var(--cream-muted); text-decoration: none; }
+.pb-foot a:hover { color: var(--cream); }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOCKUP C — Functional teaser
+   Shows the four rooms before asking for sign-in. Tiles share a
+   single hairline frame with internal dividers. Glyph + title +
+   body. CTA at the bottom.
+   ═══════════════════════════════════════════════════════════════ */
+.pc-stage {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(100dvh - 90px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 22px 22px 34px;
+}
+
+.pc-lede {
+  text-align: center;
+  margin: 14px 0 22px;
+}
+.pc-ribbon {
+  width: 140px;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+  color: var(--accent);
+  margin: 0 auto 18px;
+  display: block;
+}
+.pc-headline {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.02;
+  letter-spacing: -0.008em;
+}
+.pc-sub {
+  margin: 12px auto 0;
+  max-width: 32ch;
+  color: var(--cream-muted);
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+.pc-tiles {
+  margin: 8px 0 26px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    rgba(52, 26, 40, 0.36) 0%,
+    rgba(35, 17, 26, 0.18) 100%);
+}
+.pc-tile {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  column-gap: 14px;
+  align-items: start;
+  padding: 16px 18px;
+  position: relative;
+}
+.pc-tile + .pc-tile {
+  border-top: 1px solid var(--hairline);
+}
+.pc-tile-glyph {
+  grid-row: 1 / span 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline-strong);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background:
+    radial-gradient(60% 60% at 50% 40%,
+      var(--accent-mist) 0%,
+      transparent 100%);
+}
+.pc-tile-glyph svg {
+  width: 14px;
+  height: 14px;
+}
+.pc-tile-title {
+  margin: 1px 0 4px;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 1.1;
+  color: var(--cream);
+  letter-spacing: -0.005em;
+}
+.pc-tile-body {
+  margin: 0;
+  color: var(--cream-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.pc-actions {
+  margin-top: auto;
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pc-cta {
+  appearance: none;
+  width: 100%;
+  min-height: 52px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 14.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.20) inset,
+    0 8px 24px var(--accent-fog);
+}
+.pc-cta:active { transform: scale(0.985); }
+.pc-cta-glyph {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--accent);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  padding-bottom: 1px;
+}
+.pc-foot {
+  margin: 16px 0 0;
+  text-align: center;
+  color: var(--cream-faint);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+.pc-foot a { color: var(--cream-muted); text-decoration: none; }
+.pc-foot a:hover { color: var(--cream); }
+
+/* ═══════════════════════════════════════════════════════════════
+   Preview index (/v1-preview/signin)
+   ═══════════════════════════════════════════════════════════════ */
+.preview-index-stage {
+  position: relative;
+  z-index: 2;
+  padding: 18px 22px 34px;
+}
+.preview-index-lede {
+  text-align: center;
+  margin: 8px 0 22px;
+}
+.preview-index-lede h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--cream);
+}
+.preview-index-lede p {
+  margin: 8px auto 0;
+  max-width: 32ch;
+  color: var(--cream-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.preview-index-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.preview-index-card {
+  display: block;
+  padding: 18px;
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg,
+    rgba(52, 26, 40, 0.42) 0%,
+    rgba(35, 17, 26, 0.22) 100%);
+  background-clip: padding-box;
+  box-shadow: var(--ring-hairline, inset 0 0 0 1px var(--hairline));
+  color: var(--cream);
+  text-decoration: none;
+  transition: border-color var(--dur-state) var(--ease-settle),
+              transform var(--dur-tap) ease-out;
+}
+.preview-index-card:hover {
+  border-color: transparent;
+  box-shadow: var(--ring-hairline-strong, inset 0 0 0 1px var(--hairline-strong));
+}
+.preview-index-card:active { transform: scale(0.99); }
+.preview-index-card kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.preview-index-card h2 {
+  margin: 8px 0 4px;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1.15;
+  color: var(--cream);
+}
+.preview-index-card p {
+  margin: 0;
+  color: var(--cream-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.preview-index-back {
+  display: inline-block;
+  margin-top: 18px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+  text-decoration: none;
+}
+.preview-index-back:hover { color: var(--cream-muted); }

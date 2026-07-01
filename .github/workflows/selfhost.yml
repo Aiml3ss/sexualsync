@@ -1,0 +1,112 @@
+name: self-host
+
+# CI for the self-host (Node) edition. Separate from release-gates.yml so it
+# can never affect the Cloudflare release path. Proves the self-host runtime
+# still works as the shared product code evolves.
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "selfhost/**"
+      - "functions/**"
+      - "docs/self-host/**"
+      - "scripts/selfhost-config-check.mjs"
+      - "_headers"
+      - "_middleware.js"
+      - "package.json"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".github/workflows/selfhost.yml"
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selfhost-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (config, unit, smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # The self-host config check, realtime unit tests, and server smoke run
+      # with zero external dependencies (the runtime is dependency-free in its
+      # default filesystem mode), so no install step is needed here.
+      - name: self-host config + docs check
+        run: npm run selfhost:check
+      - name: realtime unit tests (ws codec + room registry)
+        run: npm run selfhost:test
+      - name: server smoke (handlers + adapters + live websocket)
+        run: npm run selfhost:smoke
+      - name: two-user smoke (cross-identity quiz/green-lights journey + realtime fan-out)
+        run: npm run selfhost:smoke2
+
+  build:
+    name: build web UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - name: install root deps
+        run: npm ci
+      - name: install web deps
+        run: npm --prefix web ci
+      - name: build dist (same build the Cloudflare app uses)
+        run: npm run selfhost:build
+
+  docker:
+    name: docker image (build + boot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      # Builds the SAME image self-host operators run — README "Docker
+      # (recommended)" and docker-compose.yml both point here, and the v1.0.0
+      # release advertises Docker as a first-class install path. Nothing in CI
+      # built or booted this image before, so a broken Dockerfile / two-stage
+      # COPY / healthcheck could ship undetected.
+      - name: build self-host image
+        run: docker build -t sexualsync-selfhost:ci .
+      # Boot with no -p and no env file on purpose: this proves the zero-config
+      # secure path — the server auto-generates and persists a strong
+      # APP_SESSION_SECRET on first boot (so at-rest encryption + sign-in work with
+      # no setup) — and the image's own HEALTHCHECK probes /api/health on
+      # 127.0.0.1 *inside* the container, agnostic to the listen address and also
+      # exercising the HEALTHCHECK directive itself.
+      - name: boot container, wait for HEALTHCHECK to report healthy
+        run: |
+          set -euo pipefail
+          docker run -d --name ss sexualsync-selfhost:ci
+          # `status` is a reserved read-only var in zsh — use `health` so the
+          # block is shell-agnostic if the runner default ever changes.
+          health=starting
+          for i in $(seq 1 45); do
+            health="$(docker inspect -f '{{.State.Health.Status}}' ss 2>/dev/null || echo starting)"
+            case "$health" in
+              healthy)   echo "container healthy after ~$((i * 2))s"; docker logs ss; exit 0 ;;
+              unhealthy) echo "::error::container reported unhealthy"; docker logs ss; exit 1 ;;
+            esac
+            sleep 2
+          done
+          echo "::error::container did not become healthy within 90s (last status: ${health})"
+          docker logs ss
+          exit 1
+      - name: tear down
+        if: always()
+        run: docker rm -f ss >/dev/null 2>&1 || true

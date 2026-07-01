@@ -1,0 +1,26 @@
+{
+  "name": "sexualsync",
+  "version": "1.2.136",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "description": "Sexualsync — a private intimacy request and exploration space for couples. Self-hosted on Node.",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env.selfhost selfhost/server.mjs",
+    "build": "node scripts/build.mjs",
+    "build:v1-preview": "npm --prefix web run build",
+    "test:unit": "node --test tests/unit/*.test.mjs",
+    "test": "node --test tests/unit/*.test.mjs",
+    "selfhost:check": "node scripts/selfhost-config-check.mjs",
+    "selfhost:build": "npm run build:v1-preview && npm run build",
+    "selfhost:serve": "node --env-file-if-exists=.env.selfhost selfhost/server.mjs",
+    "selfhost:test": "node --test selfhost/test/*.test.mjs",
+    "selfhost:smoke": "node selfhost/smoke.mjs",
+    "selfhost:smoke2": "node selfhost/smoke2.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

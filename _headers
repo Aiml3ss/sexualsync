@@ -1,0 +1,42 @@
+/*
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: same-origin
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://www.bellesa.co; img-src 'self' data: blob: https://*.redgifs.com https://c.bellesa.co; media-src 'self' blob: https://*.redgifs.com https://s.bellesa.co; font-src 'self' data:; frame-src 'self' https://www.redgifs.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests
+  Cross-Origin-Opener-Policy: same-origin
+
+/sw.js
+  Cache-Control: no-store, max-age=0, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/index.html
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+
+# Content-hashed Next.js build assets. Next puts a content hash in every
+# chunk/CSS/media filename, so a given URL never changes bytes — safe to cache
+# forever. Immutable caching is the cold-launch win: an iOS standalone PWA
+# reopens as a fresh process and would otherwise revalidate the whole JS/CSS
+# payload on every launch. A new build ships new hashed URLs.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/.well-known/security.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-cache
+
+/.well-known/code-transparency.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: no-cache
+
+/.well-known/code-transparency-key.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: no-cache
+
+/api/*
+  Cache-Control: no-store
