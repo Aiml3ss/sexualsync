@@ -224,6 +224,13 @@ export async function readPile(env, workspaceId) {
 }
 async function writePile(env, workspaceId, pile) {
   if (pile === null) {
+    // The active-pile key is CAS-managed: readPile → readKeyStrong serves the
+    // coordinator's strongly-consistent mirror. A plain KV delete never touches
+    // that mirror, so it keeps the just-ended pile and the next read resurrects
+    // it (and `start` then 409s on the ghost, bricking The Pile). Clear the
+    // mirror through a CAS null-write FIRST, then delete the KV key so "no active
+    // pile" (key absence) still holds and a concurrent drop's CAS sees the bump.
+    try { await mutateKey(env, STORE_NAME, pileKey(workspaceId), () => ({ value: null })); } catch {}
     try { await pileStore(env).delete(pileKey(workspaceId)); } catch {}
     return;
   }

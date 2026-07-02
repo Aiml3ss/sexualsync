@@ -1,0 +1,1384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sexualsync · the thinking behind it</title>
+<style>
+:root {
+  --ss-bg:           #170a10;
+  --ss-surface:      #23111a;
+  --ss-surface-2:    #2c1622;
+  --ss-surface-3:    #341a28;
+  --ss-hairline:        rgba(243, 220, 217, 0.08);
+  --ss-hairline-strong: rgba(243, 220, 217, 0.14);
+  --ss-rose:      #e9a8b3;
+  --ss-rose-soft: #d39ba9;
+  --ss-rose-deep: #b87989;
+  --ss-rose-fog:  rgba(233, 168, 179, 0.18);
+  --ss-cream:        #f3dcd9;
+  --ss-cream-muted:  rgba(243, 220, 217, 0.65);
+  --ss-cream-faint:  rgba(243, 220, 217, 0.32);
+  --ss-ink:          #170a10;
+  --ss-yes:         #a8c9a0;
+  --ss-counter:     #d4a574;
+  --ss-pending:     #c4a4a8;
+  --ss-tell:        #b87989;
+  --ss-declined:    #c98a82;
+  --ss-font-display: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+  --ss-font-body:    "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --ss-font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  /* motion */
+  --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back:  cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-in-out-soft: cubic-bezier(0.45, 0, 0.15, 1);
+}
+
+/* ============================ motion keyframes ============================ */
+@keyframes ssFadeUp {
+  from { opacity: 0; transform: translate3d(0, 28px, 0); filter: blur(3px); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0);    filter: blur(0); }
+}
+@keyframes ssScaleIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes ssSlideInLeft {
+  from { opacity: 0; transform: translate3d(-44px, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes ssSlideInRight {
+  from { opacity: 0; transform: translate3d(44px, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes ssDrawWave {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes ssDrawLine {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes ssDotPulse {
+  0%, 100% { box-shadow: 0 0 0.25em var(--ss-rose-fog), 0 0 0 0 rgba(233, 168, 179, 0); }
+  50%      { box-shadow: 0 0 0.4em  var(--ss-rose-fog), 0 0 0 0.18em rgba(233, 168, 179, 0.12); }
+}
+@keyframes ssAmbientDrift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%      { transform: translate3d(36px, -22px, 0) scale(1.06); }
+  66%      { transform: translate3d(-24px, 30px, 0) scale(0.98); }
+}
+@keyframes ssChipPulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--ss-bg); color: var(--ss-cream); font-family: var(--ss-font-body); -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+/* ambient rose glow in the background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  background: radial-gradient(ellipse at 30% 20%, var(--ss-rose-fog), transparent 50%),
+              radial-gradient(ellipse at 80% 80%, rgba(184, 121, 137, 0.10), transparent 55%);
+  z-index: 0;
+  pointer-events: none;
+  animation: ssAmbientDrift 38s ease-in-out infinite;
+  will-change: transform;
+}
+
+.deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6vh 8vw;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, 14px, 0) scale(0.992);
+  transition: opacity 620ms var(--ease-out-expo), transform 720ms var(--ease-out-expo);
+  will-change: opacity, transform;
+}
+.slide.is-active { opacity: 1; pointer-events: auto; transform: translate3d(0, 0, 0) scale(1); }
+
+.slide-inner { width: 100%; max-width: 1080px; position: relative; z-index: 1; }
+
+/* slide number + name strip */
+.chrome {
+  position: fixed;
+  top: 24px;
+  left: 32px;
+  right: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+  font-family: var(--ss-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ss-cream-faint);
+  pointer-events: none;
+}
+.chrome .wordmark { font-family: var(--ss-font-display); font-style: italic; font-size: 16px; letter-spacing: 0; text-transform: none; color: var(--ss-cream-muted); }
+.chrome .wordmark .dot { display: inline-block; width: 5px; height: 5px; border-radius: 999px; background: var(--ss-rose); margin: 0 5px; vertical-align: middle; transform: translateY(-2px); }
+.chrome .wordmark .sync { color: var(--ss-rose); }
+.chrome .count { display: inline-flex; align-items: center; gap: 12px; }
+
+.progress {
+  position: fixed;
+  bottom: 0; left: 0;
+  height: 2px;
+  background: var(--ss-rose);
+  box-shadow: 0 0 12px var(--ss-rose-fog);
+  z-index: 10;
+  transition: width 720ms var(--ease-out-expo);
+}
+
+.nav-hint {
+  position: fixed;
+  bottom: 22px;
+  right: 32px;
+  font-family: var(--ss-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ss-cream-faint);
+  z-index: 10;
+  pointer-events: none;
+}
+.nav-hint kbd { font-family: inherit; padding: 2px 7px; border: 1px solid var(--ss-hairline-strong); border-radius: 4px; margin: 0 2px; color: var(--ss-cream-muted); }
+
+/* ---- typographic primitives ---- */
+.eyebrow {
+  font-family: var(--ss-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ss-rose);
+  margin-bottom: 18px;
+}
+.display {
+  font-family: var(--ss-font-display);
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.005em;
+  color: var(--ss-cream);
+}
+.display .accent { color: var(--ss-rose); }
+.lede {
+  font-family: var(--ss-font-display);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ss-cream-muted);
+  line-height: 1.3;
+}
+.body {
+  font-family: var(--ss-font-body);
+  font-weight: 300;
+  color: var(--ss-cream-muted);
+  line-height: 1.65;
+}
+.body strong { color: var(--ss-cream); font-weight: 500; }
+.mono {
+  font-family: var(--ss-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ss-cream-faint);
+}
+
+/* ---- slide 1 — cover ---- */
+.cover { text-align: center; }
+.cover .mark { width: 110px; margin: 0 auto 36px; opacity: 0.95; }
+.cover .wordmark-big {
+  font-family: var(--ss-font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(56px, 9vw, 108px);
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.cover .wordmark-big .dot { display: inline-block; width: 0.13em; height: 0.13em; border-radius: 999px; background: var(--ss-rose); margin: 0 0.16em; vertical-align: 0.07em; box-shadow: 0 0 0.25em var(--ss-rose-fog); }
+.cover .wordmark-big .sync { color: var(--ss-rose); }
+.cover .tagline {
+  margin-top: 36px;
+  font-family: var(--ss-font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(22px, 2.4vw, 30px);
+  color: var(--ss-cream-muted);
+}
+.cover .tagline .accent { color: var(--ss-rose); }
+.cover .sub {
+  margin-top: 28px;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+  color: var(--ss-cream-faint);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* ---- two-column ---- */
+.two-col { display: grid; grid-template-columns: 1.05fr 1fr; gap: 64px; align-items: center; }
+.two-col.narrow { grid-template-columns: 1fr 1fr; }
+
+/* ---- cards ---- */
+.card {
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-hairline);
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+}
+.card .label { font-family: var(--ss-font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ss-rose); margin-bottom: 10px; }
+.card h3 { font-family: var(--ss-font-display); font-style: italic; font-weight: 500; font-size: 24px; color: var(--ss-cream); margin-bottom: 8px; line-height: 1.15; }
+.card p { font-size: 13px; line-height: 1.6; color: var(--ss-cream-muted); }
+
+/* ---- feature grid ---- */
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 32px; }
+.feature-grid .card { padding: 18px 18px; }
+.feature-grid .card h3 { font-size: 19px; margin-bottom: 6px; }
+.feature-grid .card p { font-size: 12.5px; line-height: 1.55; }
+
+/* ---- ask card mock ---- */
+.ask-mock {
+  background: var(--ss-surface-2);
+  border: 1px solid var(--ss-hairline-strong);
+  border-radius: 18px;
+  padding: 22px 22px 20px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  position: relative;
+  overflow: hidden;
+}
+.ask-mock::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(140deg, var(--ss-rose-fog), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+.ask-mock > * { position: relative; z-index: 1; }
+.ask-mock .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.ask-mock .from { font-family: var(--ss-font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ss-cream-faint); }
+.ask-mock .chip { font-family: var(--ss-font-mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: var(--ss-rose-fog); color: var(--ss-rose); }
+.ask-mock .acts { font-family: var(--ss-font-display); font-style: italic; font-size: 28px; color: var(--ss-cream); line-height: 1.25; margin-bottom: 18px; }
+.ask-mock .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.ask-mock .pill { font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--ss-hairline-strong); color: var(--ss-cream-muted); background: rgba(243,220,217,0.04); }
+.ask-mock .note { font-size: 13px; color: var(--ss-cream-muted); line-height: 1.6; font-style: italic; padding-top: 14px; border-top: 1px solid var(--ss-hairline); }
+.ask-mock .actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.ask-mock .btn { font-family: var(--ss-font-body); font-size: 12.5px; font-weight: 500; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--ss-hairline-strong); color: var(--ss-cream); background: rgba(243,220,217,0.03); }
+.ask-mock .btn.yes { background: var(--ss-rose); color: var(--ss-ink); border-color: var(--ss-rose); }
+.ask-mock .btn.counter { color: var(--ss-counter); }
+.ask-mock .btn.tell { color: var(--ss-tell); }
+
+/* annotation callouts pointing at the ask mock */
+.callouts { position: relative; }
+.callout { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+.callout .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ss-rose); margin-top: 7px; flex-shrink: 0; box-shadow: 0 0 12px var(--ss-rose-fog); }
+.callout .text { font-size: 13px; color: var(--ss-cream-muted); line-height: 1.55; }
+.callout .text strong { color: var(--ss-cream); font-weight: 500; display: block; margin-bottom: 2px; font-family: var(--ss-font-display); font-style: italic; font-size: 17px; }
+
+/* ---- process flow ---- */
+.flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-top: 28px; position: relative; }
+.flow::before {
+  content: '';
+  position: absolute;
+  top: 34px;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--ss-rose), transparent);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.flow-step { padding: 18px 14px 16px; text-align: center; position: relative; z-index: 1; }
+.flow-step .num {
+  width: 32px; height: 32px; border-radius: 999px;
+  background: var(--ss-surface-2);
+  border: 1px solid var(--ss-rose);
+  color: var(--ss-rose);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ss-font-mono);
+  font-size: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 0 14px var(--ss-rose-fog);
+}
+.flow-step h4 {
+  font-family: var(--ss-font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 18px;
+  color: var(--ss-cream);
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+.flow-step p { font-size: 12px; color: var(--ss-cream-muted); line-height: 1.5; }
+
+/* ---- pile flow ---- */
+.pile { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 24px; }
+.pile-side { padding: 22px; background: var(--ss-surface); border: 1px solid var(--ss-hairline); border-radius: 16px; }
+.pile-side .who { font-family: var(--ss-font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ss-rose); margin-bottom: 14px; }
+.pile-side .stack { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.pile-side .stack .act { padding: 8px 12px; border-radius: 8px; background: var(--ss-surface-2); border: 1px solid var(--ss-hairline); font-size: 13px; color: var(--ss-cream-muted); font-style: italic; font-family: var(--ss-font-display); font-size: 15px; }
+.pile-side .stack .act.match { border-color: var(--ss-rose); color: var(--ss-rose); background: var(--ss-rose-fog); }
+.pile-side .stack .act.hidden { color: var(--ss-cream-faint); text-align: center; letter-spacing: 0.2em; font-family: var(--ss-font-mono); font-size: 10px; font-style: normal; text-transform: uppercase; }
+.pile-arrow { text-align: center; font-family: var(--ss-font-mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ss-rose); margin: 16px 0 8px; }
+
+/* ---- privacy stack ---- */
+.privacy-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+.privacy-layer { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 18px; padding: 14px 18px; background: var(--ss-surface); border: 1px solid var(--ss-hairline); border-radius: 12px; }
+.privacy-layer .layer-label { font-family: var(--ss-font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ss-rose); }
+.privacy-layer .layer-body { font-size: 13px; color: var(--ss-cream-muted); line-height: 1.55; }
+.privacy-layer .layer-body strong { color: var(--ss-cream); font-weight: 500; }
+
+/* ---- tech grid ---- */
+.tech-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 24px; }
+.tech-row { display: grid; grid-template-columns: 110px 1fr; gap: 18px; padding: 12px 16px; background: var(--ss-surface); border: 1px solid var(--ss-hairline); border-radius: 10px; }
+.tech-row .k { font-family: var(--ss-font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ss-rose); align-self: center; }
+.tech-row .v { font-size: 13px; color: var(--ss-cream-muted); line-height: 1.5; }
+.tech-row .v strong { color: var(--ss-cream); font-weight: 500; }
+
+/* ---- closing slide ---- */
+.closer { text-align: center; }
+.closer .display { font-size: clamp(48px, 7vw, 84px); }
+.closer .sign { margin-top: 40px; color: var(--ss-cream-faint); font-size: 13px; letter-spacing: 0.08em; }
+
+/* room visual (slide 3) */
+.room-visual { display: flex; align-items: center; justify-content: center; gap: 26px; padding: 30px 10px; }
+.room-visual .person {
+  width: 88px; height: 88px; border-radius: 999px;
+  background: var(--ss-surface-2);
+  border: 1px solid var(--ss-hairline-strong);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--ss-font-display); font-style: italic; font-size: 32px; color: var(--ss-cream);
+  box-shadow: 0 0 30px rgba(0,0,0,0.4);
+}
+.room-visual .room {
+  flex: 1;
+  max-width: 320px;
+  height: 180px;
+  border-radius: 24px;
+  border: 1.5px solid var(--ss-rose);
+  background: radial-gradient(ellipse at 50% 50%, var(--ss-rose-fog), transparent 70%);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--ss-font-display); font-style: italic; font-size: 22px; color: var(--ss-rose);
+  box-shadow: 0 0 60px var(--ss-rose-fog), inset 0 0 40px rgba(0,0,0,0.3);
+  position: relative;
+}
+.room-visual .room::before, .room-visual .room::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 26px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--ss-rose), transparent);
+}
+.room-visual .room::before { left: -26px; }
+.room-visual .room::after { right: -26px; }
+
+/* limits slide */
+.limit-demo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
+.limit-row { padding: 14px 16px; background: var(--ss-surface); border: 1px solid var(--ss-hairline); border-radius: 12px; }
+.limit-row .level { font-family: var(--ss-font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 6px; }
+.limit-row .desc { font-size: 13px; color: var(--ss-cream-muted); line-height: 1.55; }
+.limit-row.hard .level { color: var(--ss-declined); }
+.limit-row.talk .level { color: var(--ss-counter); }
+.limit-row.soft .level { color: var(--ss-pending); }
+.limit-row.yes .level { color: var(--ss-yes); }
+
+ul.cleanlist { list-style: none; }
+ul.cleanlist li {
+  padding-left: 22px;
+  position: relative;
+  margin-bottom: 12px;
+  color: var(--ss-cream-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+ul.cleanlist li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ss-rose);
+  box-shadow: 0 0 8px var(--ss-rose-fog);
+}
+ul.cleanlist li strong { color: var(--ss-cream); font-weight: 500; }
+
+/* small ambient wave sigil bottom-left of certain slides */
+.sigil { position: absolute; bottom: 28px; left: 32px; width: 64px; opacity: 0.35; z-index: 0; }
+
+/* phone-framed screenshots */
+.phone {
+  border-radius: 30px;
+  border: 1px solid var(--ss-hairline-strong);
+  background: var(--ss-bg);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(243, 220, 217, 0.04), inset 0 0 0 2px rgba(243, 220, 217, 0.03);
+  overflow: hidden;
+  position: relative;
+}
+.phone img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+
+.hero-phone {
+  width: min(320px, 100%);
+  aspect-ratio: 9 / 19.5;
+  margin: 0 auto;
+}
+
+.shot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px 16px;
+  margin-top: 22px;
+}
+.shot-tile { display: flex; flex-direction: column; gap: 8px; }
+.shot-tile .phone {
+  aspect-ratio: 9 / 10;
+  border-radius: 16px;
+}
+.shot-tile .cap {
+  font-family: var(--ss-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ss-cream-faint);
+  text-align: center;
+  line-height: 1.3;
+}
+.shot-tile .cap strong {
+  display: block;
+  font-family: var(--ss-font-display);
+  font-style: italic;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ss-cream);
+  margin-bottom: 2px;
+  font-weight: 500;
+}
+
+/* ============================ active-slide choreography ============================ */
+/* Children fade-up in cascade when their slide becomes active. */
+.slide.is-active .eyebrow  { animation: ssFadeUp 700ms var(--ease-out-expo)  80ms both; }
+.slide.is-active .display  { animation: ssFadeUp 900ms var(--ease-out-expo) 200ms both; }
+.slide.is-active .lede     { animation: ssFadeUp 760ms var(--ease-out-expo) 340ms both; }
+.slide.is-active .body     { animation: ssFadeUp 720ms var(--ease-out-expo) 400ms both; }
+
+/* generic blocks */
+.slide.is-active .card,
+.slide.is-active .privacy-layer,
+.slide.is-active .limit-row,
+.slide.is-active .flow-step,
+.slide.is-active .callout,
+.slide.is-active ul.cleanlist li {
+  animation: ssFadeUp 640ms var(--ease-out-expo) 460ms both;
+}
+
+/* feature grid (slide 4) — 9-card cascade */
+.slide.is-active .feature-grid .card:nth-child(1) { animation-delay: 400ms; }
+.slide.is-active .feature-grid .card:nth-child(2) { animation-delay: 460ms; }
+.slide.is-active .feature-grid .card:nth-child(3) { animation-delay: 520ms; }
+.slide.is-active .feature-grid .card:nth-child(4) { animation-delay: 580ms; }
+.slide.is-active .feature-grid .card:nth-child(5) { animation-delay: 640ms; }
+.slide.is-active .feature-grid .card:nth-child(6) { animation-delay: 700ms; }
+.slide.is-active .feature-grid .card:nth-child(7) { animation-delay: 760ms; }
+.slide.is-active .feature-grid .card:nth-child(8) { animation-delay: 820ms; }
+.slide.is-active .feature-grid .card:nth-child(9) { animation-delay: 880ms; }
+
+/* privacy stack (slide 11) */
+.slide.is-active .privacy-layer:nth-child(1) { animation-delay: 380ms; }
+.slide.is-active .privacy-layer:nth-child(2) { animation-delay: 460ms; }
+.slide.is-active .privacy-layer:nth-child(3) { animation-delay: 540ms; }
+.slide.is-active .privacy-layer:nth-child(4) { animation-delay: 620ms; }
+.slide.is-active .privacy-layer:nth-child(5) { animation-delay: 700ms; }
+
+/* limit rows (slide 8) */
+.slide.is-active .limit-row:nth-child(1) { animation-delay: 460ms; }
+.slide.is-active .limit-row:nth-child(2) { animation-delay: 540ms; }
+.slide.is-active .limit-row:nth-child(3) { animation-delay: 620ms; }
+.slide.is-active .limit-row:nth-child(4) { animation-delay: 700ms; }
+
+/* flow steps + draw-in line (slide 6) */
+.slide.is-active .flow-step:nth-child(1) { animation-delay: 500ms; }
+.slide.is-active .flow-step:nth-child(2) { animation-delay: 640ms; }
+.slide.is-active .flow-step:nth-child(3) { animation-delay: 780ms; }
+.slide.is-active .flow-step:nth-child(4) { animation-delay: 920ms; }
+.slide.is-active .flow-step:nth-child(5) { animation-delay: 1060ms; }
+.flow::before { transform-origin: left center; transform: scaleX(0); }
+.slide.is-active .flow::before { animation: ssDrawLine 1500ms var(--ease-out-expo) 720ms both; }
+
+/* callouts (slide 5) */
+.slide.is-active .callouts .callout:nth-child(1) { animation-delay: 500ms; }
+.slide.is-active .callouts .callout:nth-child(2) { animation-delay: 580ms; }
+.slide.is-active .callouts .callout:nth-child(3) { animation-delay: 660ms; }
+.slide.is-active .callouts .callout:nth-child(4) { animation-delay: 740ms; }
+.slide.is-active .callouts .callout:nth-child(5) { animation-delay: 820ms; }
+
+/* hero phone (slide 12) */
+.slide.is-active .hero-phone { animation: ssScaleIn 1000ms var(--ease-out-expo) 360ms both; }
+
+/* gallery (slide 13) */
+.slide.is-active .shot-tile { animation: ssFadeUp 640ms var(--ease-out-expo) both; }
+.slide.is-active .shot-tile:nth-child(1) { animation-delay: 380ms; }
+.slide.is-active .shot-tile:nth-child(2) { animation-delay: 440ms; }
+.slide.is-active .shot-tile:nth-child(3) { animation-delay: 500ms; }
+.slide.is-active .shot-tile:nth-child(4) { animation-delay: 560ms; }
+.slide.is-active .shot-tile:nth-child(5) { animation-delay: 620ms; }
+.slide.is-active .shot-tile:nth-child(6) { animation-delay: 680ms; }
+.slide.is-active .shot-tile:nth-child(7) { animation-delay: 740ms; }
+.slide.is-active .shot-tile:nth-child(8) { animation-delay: 800ms; }
+
+/* cleanlist (slide 7) */
+.slide.is-active ul.cleanlist li:nth-child(1) { animation-delay: 480ms; }
+.slide.is-active ul.cleanlist li:nth-child(2) { animation-delay: 560ms; }
+.slide.is-active ul.cleanlist li:nth-child(3) { animation-delay: 640ms; }
+.slide.is-active ul.cleanlist li:nth-child(4) { animation-delay: 720ms; }
+.slide.is-active ul.cleanlist li:nth-child(5) { animation-delay: 800ms; }
+
+/* room visual (slide 3) — A from left, B from right, room scales in */
+.slide.is-active .room-visual .person:first-child { animation: ssSlideInLeft 850ms var(--ease-out-expo) 480ms both; }
+.slide.is-active .room-visual .room               { animation: ssScaleIn  1000ms var(--ease-out-expo) 360ms both; }
+.slide.is-active .room-visual .person:last-child  { animation: ssSlideInRight 850ms var(--ease-out-expo) 480ms both; }
+
+/* ask mock (slide 5) — scales up under callouts */
+.slide.is-active .ask-mock { animation: ssScaleIn 820ms var(--ease-out-expo) 340ms both; }
+.ask-mock .chip { animation: ssChipPulse 2.4s ease-in-out infinite; }
+
+/* pile (slide 9) — A from left, B from right, then arrow, then reveal */
+.slide.is-active .pile > .pile-side:first-child  { animation: ssSlideInLeft  900ms var(--ease-out-expo) 420ms both; }
+.slide.is-active .pile > .pile-side:last-child   { animation: ssSlideInRight 900ms var(--ease-out-expo) 420ms both; }
+.slide.is-active .pile-arrow                     { animation: ssFadeUp 700ms var(--ease-out-expo) 1050ms both; }
+.slide.is-active .pile ~ .pile-side              { animation: ssScaleIn 800ms var(--ease-out-expo) 1250ms both; }
+.slide.is-active .pile ~ .pile-side .act.match:nth-child(1) { animation: ssFadeUp 600ms var(--ease-out-expo) 1500ms both; }
+.slide.is-active .pile ~ .pile-side .act.match:nth-child(2) { animation: ssFadeUp 600ms var(--ease-out-expo) 1620ms both; }
+
+/* cover (slide 1) — wave draws, wordmark scales, dot starts pulsing */
+.cover .mark path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.slide.is-active .cover .mark path:nth-child(1) { animation: ssDrawWave 1.6s var(--ease-out-expo)  200ms forwards; }
+.slide.is-active .cover .mark path:nth-child(2) { animation: ssDrawWave 1.8s var(--ease-out-expo)  500ms forwards; }
+.slide.is-active .cover .wordmark-big { animation: ssScaleIn 1100ms var(--ease-out-expo) 700ms both; }
+.slide.is-active .cover .tagline      { animation: ssFadeUp  800ms var(--ease-out-expo) 1400ms both; }
+.slide.is-active .cover .sub          { animation: ssFadeUp  720ms var(--ease-out-expo) 1600ms both; }
+.cover .wordmark-big .dot { animation: ssDotPulse 3.6s ease-in-out 2.4s infinite; }
+
+/* closer (slide 12) — same wave-draw treatment */
+.closer svg path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.slide.is-active .closer svg path:nth-child(1) { animation: ssDrawWave 1.6s var(--ease-out-expo) 200ms forwards; }
+.slide.is-active .closer svg path:nth-child(2) { animation: ssDrawWave 1.8s var(--ease-out-expo) 500ms forwards; }
+.slide.is-active .closer .display { animation: ssFadeUp 900ms var(--ease-out-expo) 800ms both; }
+.slide.is-active .closer .lede    { animation: ssFadeUp 800ms var(--ease-out-expo) 1100ms both; }
+.slide.is-active .closer .sign    { animation: ssFadeUp 700ms var(--ease-out-expo) 1300ms both; }
+
+/* hover lift on interactive surfaces */
+.card, .ask-mock, .privacy-layer, .limit-row, .pile-side, .phone {
+  transition: transform 400ms var(--ease-out-expo), box-shadow 400ms var(--ease-out-expo), border-color 400ms var(--ease-out-expo);
+}
+.card:hover, .privacy-layer:hover, .limit-row:hover, .pile-side:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+  border-color: var(--ss-hairline-strong);
+}
+.shot-tile .phone:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(243, 220, 217, 0.08);
+}
+.ask-mock:hover { transform: translateY(-3px); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45); }
+.ask-mock .btn { transition: transform 220ms var(--ease-out-expo), background 220ms ease; }
+.ask-mock .btn:hover { transform: translateY(-1px); }
+
+/* honor user motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .slide { transform: none; }
+}
+
+@media (max-width: 900px) {
+  .two-col { grid-template-columns: 1fr; gap: 30px; }
+  .flow { grid-template-columns: repeat(2, 1fr); }
+  .flow::before { display: none; }
+  .feature-grid { grid-template-columns: 1fr 1fr; }
+  .pile { grid-template-columns: 1fr; }
+  .limit-demo { grid-template-columns: 1fr; }
+  .tech-grid { grid-template-columns: 1fr; }
+  .shot-grid { grid-template-columns: repeat(2, 1fr); }
+  .slide { padding: 10vh 6vw; }
+}
+
+@media (max-width: 700px) {
+  html, body { overflow: hidden; }
+  .deck { height: 100dvh; }
+  .chrome {
+    top: max(14px, env(safe-area-inset-top));
+    left: 16px;
+    right: 16px;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 9px;
+    line-height: 1.35;
+  }
+  .chrome .wordmark { font-size: 15px; white-space: nowrap; }
+  .chrome .count {
+    justify-content: flex-end;
+    gap: 5px;
+    max-width: 170px;
+    text-align: right;
+  }
+  .nav-hint { display: none; }
+  .slide {
+    align-items: flex-start;
+    justify-content: flex-start;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: calc(72px + env(safe-area-inset-top)) 18px calc(72px + env(safe-area-inset-bottom));
+  }
+  .slide-inner {
+    max-width: none;
+    width: 100%;
+  }
+  .eyebrow {
+    font-size: 9.5px;
+    line-height: 1.35;
+    margin-bottom: 12px;
+  }
+  .display {
+    line-height: 1.08;
+    letter-spacing: 0;
+  }
+  .body {
+    font-size: 14px !important;
+    line-height: 1.55;
+  }
+  .lede {
+    font-size: 18px !important;
+    line-height: 1.28;
+  }
+  .cover .mark { width: 76px; margin-bottom: 24px; }
+  .cover .wordmark-big { font-size: clamp(42px, 16vw, 60px); }
+  .cover .tagline { margin-top: 22px; font-size: 23px; }
+  .cover .sub { margin-top: 18px; font-size: 13px; line-height: 1.55; }
+  .two-col,
+  .two-col.narrow,
+  .feature-grid,
+  .flow,
+  .pile,
+  .limit-demo,
+  .tech-grid,
+  .shot-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px;
+  }
+  .feature-grid { margin-top: 20px; }
+  .feature-grid .card,
+  .card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+  .card h3 { font-size: 21px; }
+  .card p,
+  .feature-grid .card p {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .room-visual {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
+    gap: 8px;
+    padding: 20px 0;
+  }
+  .room-visual .person {
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
+  }
+  .room-visual .room {
+    min-width: 0;
+    height: 96px;
+    border-radius: 18px;
+    font-size: 18px;
+  }
+  .room-visual .room::before,
+  .room-visual .room::after { width: 8px; }
+  .room-visual .room::before { left: -8px; }
+  .room-visual .room::after { right: -8px; }
+  .flow-step {
+    padding: 14px 12px;
+    text-align: left;
+    border: 1px solid var(--ss-hairline);
+    border-radius: 12px;
+    background: var(--ss-surface);
+  }
+  .flow-step .num {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 8px;
+  }
+  .limit-row,
+  .pile-side,
+  .privacy-layer {
+    padding: 14px;
+    border-radius: 12px;
+  }
+  .privacy-layer {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .privacy-layer .layer-body,
+  .limit-row .desc { font-size: 13px; line-height: 1.5; }
+  .callout { gap: 10px; margin-bottom: 12px; }
+  .callout .text { font-size: 13px; line-height: 1.48; }
+  .hero-phone {
+    width: min(220px, 72vw) !important;
+  }
+  .phone {
+    border-radius: 22px;
+  }
+  .shot-tile .phone {
+    aspect-ratio: 9 / 14;
+    max-height: 240px;
+    width: min(180px, 54vw);
+    margin: 0 auto;
+  }
+  .shot-tile .cap { font-size: 9px; }
+  .closer .display { font-size: clamp(40px, 14vw, 58px) !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <div class="wordmark"><em>sexual</em><span class="dot"></span><em class="sync">sync</em></div>
+  <div class="count"><span id="slide-name">Cover</span> · <span id="slide-num">01</span> / <span id="slide-total">15</span></div>
+</div>
+
+<div class="deck" id="deck">
+
+  <!-- ====== 1. Cover ====== -->
+  <section class="slide is-active" data-name="Cover">
+    <div class="slide-inner cover">
+      <svg class="mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path pathLength="1" d="M 12,50 C 22,30 38,30 50,50 C 62,70 78,70 88,50" fill="none" stroke="#e9a8b3" stroke-width="3.5" stroke-linecap="round"></path>
+        <path pathLength="1" d="M 12,62 C 22,42 38,42 50,62 C 62,82 78,82 88,62" fill="none" stroke="#e9a8b3" stroke-width="3.5" stroke-linecap="round" opacity="0.45"></path>
+      </svg>
+      <div class="wordmark-big"><em>sexual</em><span class="dot"></span><em class="sync">sync</em></div>
+      <p class="tagline">Get curious. <span class="accent">Get in sync.</span></p>
+      <p class="sub">A private, mobile-first room for couples to talk about what they want. This is a short walkthrough of the thinking behind it and how it works once two people are inside.</p>
+    </div>
+  </section>
+
+  <!-- ====== 2. The Why ====== -->
+  <section class="slide" data-name="The why">
+    <div class="slide-inner">
+      <p class="eyebrow">Premise</p>
+      <h1 class="display" style="font-size: clamp(36px, 5vw, 64px); margin-bottom: 28px;">Some conversations are easier to start in writing.</h1>
+      <div class="two-col">
+        <div>
+          <p class="body" style="font-size: 17px; margin-bottom: 18px;">Sexualsync gives two adults a private room to ask clearly, share limits, save ideas, and find overlap before the conversation has to happen out loud.</p>
+          <p class="body" style="font-size: 17px;">The core idea is simple: make the first sentence easier, keep the room private, and leave space for yes, no, counter, or "tell me later" without pressure.</p>
+        </div>
+        <div class="card" style="background: var(--ss-surface-2); border-color: var(--ss-hairline-strong);">
+          <p class="label">The premise that survived</p>
+          <p style="font-family: var(--ss-font-display); font-style: italic; font-size: 22px; line-height: 1.35; color: var(--ss-cream);">Some things are easier to type than say.</p>
+          <p class="body" style="margin-top: 14px; font-size: 13px;">Not because the people don't want to talk. Because the cold start is hard. Sexualsync removes the cold start.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 3. A room for two ====== -->
+  <section class="slide" data-name="A room for two">
+    <div class="slide-inner">
+      <p class="eyebrow">The shape</p>
+      <h1 class="display" style="font-size: clamp(36px, 5vw, 60px); margin-bottom: 8px;">One room. <span class="accent">Two people.</span> Nothing else.</h1>
+      <p class="lede" style="font-size: 20px; margin-bottom: 8px;">No feed. No discovery. No followers. No directory.</p>
+
+      <div class="room-visual">
+        <div class="person"><em>A</em></div>
+        <div class="room">private room</div>
+        <div class="person"><em>B</em></div>
+      </div>
+
+      <div class="two-col" style="margin-top: 24px;">
+        <p class="body">One partner creates the room and sends an invite link. The other accepts after Google sign-in. From that point on the room is the only place this content exists. There is no profile to find, no username to search, no public side of the product at all.</p>
+        <p class="body">Everything you do — every Ask, every limit, every saved fantasy — lives inside that single shared surface. The product has no concept of "the public version of you." It only has the two people who belong in this room.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 4. What's inside ====== -->
+  <section class="slide" data-name="What's inside">
+    <div class="slide-inner">
+      <p class="eyebrow">Inside the room</p>
+      <h1 class="display" style="font-size: clamp(32px, 4.5vw, 52px);">A small set of pieces that <span class="accent">do specific things</span>.</h1>
+      <p class="body" style="margin-top: 14px; max-width: 720px;">Each piece is built around a different conversation that's hard to start. They're separate on purpose — different rooms of the same house.</p>
+
+      <div class="feature-grid">
+        <div class="card">
+          <p class="label">Asks</p>
+          <h3>Make the request.</h3>
+          <p>Pick the act, the timing, whether to film, add a note. Send it. Get a yes, a counter, or a pass.</p>
+        </div>
+        <div class="card">
+          <p class="label">Acts</p>
+          <h3>A shared library.</h3>
+          <p>Start with built-ins, add the words that fit you both. Asks pull from this — so what you call things is yours.</p>
+        </div>
+        <div class="card">
+          <p class="label">Limits</p>
+          <h3>Lines that stay visible.</h3>
+          <p>Hard no, talk-first, soft, yes-with-conditions. Asks warn or block when they cross one — before anything is sent.</p>
+        </div>
+        <div class="card">
+          <p class="label">Inspiration</p>
+          <h3>Fantasies, before plans.</h3>
+          <p>A kink, a scene, a what-if. Posting it is your interest signal. Your partner's <em>me too</em> is what makes it mutual.</p>
+        </div>
+        <div class="card">
+          <p class="label">The Shelf</p>
+          <h3>Save what catches you.</h3>
+          <p>Links, passages, clips, anything worth coming back to. Items open hidden until a partner chooses to reveal them.</p>
+        </div>
+        <div class="card">
+          <p class="label">The Vault</p>
+          <h3>For just the two of you.</h3>
+          <p>Encrypted clips, encrypted titles, encrypted comments. The server never sees the passphrase. Only you do.</p>
+        </div>
+        <div class="card">
+          <p class="label">The Pile</p>
+          <h3>Find the overlap.</h3>
+          <p>Both partners privately drop acts. Nothing reveals until both lock in. Only the matches surface.</p>
+        </div>
+        <div class="card">
+          <p class="label">Blind Reveal</p>
+          <h3>Answer first, see second.</h3>
+          <p>One prompt, both answer in private. Neither answer opens until both are in. No influence either way.</p>
+        </div>
+        <div class="card">
+          <p class="label">Sext</p>
+          <h3>Just the two of you.</h3>
+          <p>A private message thread. Photos and GIFs encrypt in your browser before they upload — nobody else can read it.</p>
+        </div>
+        <div class="card">
+          <p class="label">Sex Quiz</p>
+          <h3>Compare the yeses.</h3>
+          <p>Both answer the same deck alone. The result surfaces only where you already agree — never a one-sided want.</p>
+        </div>
+        <div class="card">
+          <p class="label">Green Lights</p>
+          <h3>What's on the table.</h3>
+          <p>A standing yes / curious / not-now list you each fill in private. Where they overlap becomes a shared menu.</p>
+        </div>
+        <div class="card">
+          <p class="label">Sexboard</p>
+          <h3>The home view.</h3>
+          <p>Active Asks, partner activity, game status, recent overlap, anything waiting on you. One glance.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 5. Pull-quote ====== -->
+  <section class="slide" data-name="Say it">
+    <div class="slide-inner" style="text-align: center;">
+      <p class="eyebrow">In a few words</p>
+      <h1 class="display" style="font-size: clamp(48px, 8vw, 104px); line-height: 1.05; margin-bottom: 32px;">Say it without <span class="accent">saying it.</span></h1>
+      <p class="lede" style="font-size: 20px; max-width: 560px; margin-left: auto; margin-right: auto;">An alternate tagline the brand kept around. It's the whole thesis in five words.</p>
+    </div>
+  </section>
+
+  <!-- ====== 6. Anatomy of an Ask ====== -->
+  <section class="slide" data-name="Anatomy of an Ask">
+    <div class="slide-inner">
+      <p class="eyebrow">A closer look</p>
+      <h1 class="display" style="font-size: clamp(28px, 3.6vw, 42px); margin-bottom: 24px;">Anatomy of an <span class="accent">Ask</span>.</h1>
+
+      <div class="two-col">
+        <div class="hero-phone phone" style="width: min(280px, 100%);">
+          <img loading="lazy" alt="Ask detail" src="/docs/screenshots/share/05-ask-detail.png">
+        </div>
+
+        <div class="callouts">
+          <div class="callout">
+            <span class="dot"></span>
+            <div class="text"><strong>The acts</strong>Pulled from your shared library. Whatever you call it together is what shows up here.</div>
+          </div>
+          <div class="callout">
+            <span class="dot"></span>
+            <div class="text"><strong>The when</strong>Timing is a first-class field, not an afterthought. "Tonight" and "this weekend" lead to very different yeses.</div>
+          </div>
+          <div class="callout">
+            <span class="dot"></span>
+            <div class="text"><strong>The filming preference</strong>Set per Ask. Defaults are easy to change. No ambiguity at the moment.</div>
+          </div>
+          <div class="callout">
+            <span class="dot"></span>
+            <div class="text"><strong>The note</strong>Optional. Often this is where the actual asking happens — the words that wouldn't come out in person.</div>
+          </div>
+          <div class="callout">
+            <span class="dot"></span>
+            <div class="text"><strong>The responses</strong>Three paths: yes, counter, or pass. No path is the wrong path.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 6. The Ask flow ====== -->
+  <section class="slide" data-name="The Ask flow">
+    <div class="slide-inner">
+      <p class="eyebrow">Process flow</p>
+      <h1 class="display" style="font-size: clamp(32px, 4.2vw, 48px);">How an Ask travels.</h1>
+      <p class="body" style="margin-top: 10px; max-width: 720px;">From draft to response, every step is built to keep the room private and the lock screen quiet.</p>
+
+      <div class="flow">
+        <div class="flow-step">
+          <div class="num">1</div>
+          <h4>Draft</h4>
+          <p>Partner A picks acts, timing, filming preference, and an optional note.</p>
+        </div>
+        <div class="flow-step">
+          <div class="num">2</div>
+          <h4>Limit check</h4>
+          <p>If anything crosses a saved limit, the app warns or blocks before send.</p>
+        </div>
+        <div class="flow-step">
+          <div class="num">3</div>
+          <h4>Encrypt &amp; store</h4>
+          <p>The Ask is encrypted at rest, written to durable storage, opaque to outsiders.</p>
+        </div>
+        <div class="flow-step">
+          <div class="num">4</div>
+          <h4>Quiet ping</h4>
+          <p>Partner B gets a push. The lock-screen text is generic. No body copy leaks.</p>
+        </div>
+        <div class="flow-step">
+          <div class="num">5</div>
+          <h4>Respond</h4>
+          <p>Yes, counter, or pass. A's Sexboard updates.</p>
+        </div>
+      </div>
+
+      <div style="margin-top: 44px; padding: 18px 22px; background: var(--ss-surface); border: 1px solid var(--ss-hairline); border-radius: 14px; max-width: 760px;">
+        <p class="mono" style="margin-bottom: 8px;">A note on encryption</p>
+        <p class="body" style="font-size: 14px;">Shared-room records — Asks, Acts, Limits, Inspiration, Shelf, activity, feedback — are encrypted before they land in durable storage. If someone got unauthorized database access, they'd see ciphertext, not the contents of the room.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 7. Sexboard ====== -->
+  <section class="slide" data-name="Sexboard">
+    <div class="slide-inner">
+      <p class="eyebrow">Home view</p>
+      <h1 class="display" style="font-size: clamp(34px, 4.6vw, 54px); margin-bottom: 14px;">The Sexboard is the one screen <span class="accent">that summarizes the room</span>.</h1>
+      <div class="two-col">
+        <div>
+          <p class="body" style="margin-bottom: 16px;">It's tuned for the most common question a couple actually has: <em>"is there anything I need to look at?"</em></p>
+          <ul class="cleanlist">
+            <li><strong>Active Asks.</strong> What's open, what's awaiting a reply, what's scheduled.</li>
+            <li><strong>Partner activity.</strong> Who did what recently, in safe labels — never intimate body copy.</li>
+            <li><strong>Live game status.</strong> Open Pile rounds, Blind Reveal prompts ready to reveal.</li>
+            <li><strong>Recent overlap.</strong> Things you both said yes to in the last little while.</li>
+            <li><strong>Anything waiting on you.</strong> The single most important panel — surfaces what you owe a response to.</li>
+          </ul>
+        </div>
+        <div class="card" style="background: var(--ss-surface-2);">
+          <p class="label">Design rule</p>
+          <p style="font-family: var(--ss-font-display); font-style: italic; font-size: 22px; color: var(--ss-cream); line-height: 1.3; margin-bottom: 14px;">The board tells you the state of the room without describing the state of the room.</p>
+          <p class="body" style="font-size: 13px;">A status pill that says "they want your take" tells you everything you need to know about urgency, and nothing about the act involved.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== Sext ====== -->
+  <section class="slide" data-name="Sext">
+    <div class="slide-inner">
+      <p class="eyebrow">A closer look · the direct channel</p>
+      <h1 class="display" style="font-size: clamp(32px, 4.4vw, 50px);">When you'd rather <span class="accent">just say it</span>, there's Sext.</h1>
+      <p class="body" style="margin-top: 10px; max-width: 760px;">A two-person message thread. No group, no shared inbox, no third party in the middle — only the two people in the room.</p>
+
+      <div class="feature-grid" style="margin-top: 28px;">
+        <div class="card">
+          <p class="label">Text, emoji, GIFs</p>
+          <h3>Talk how you talk.</h3>
+          <p>Quick emoji, a searchable GIF picker, replies, reactions, edits, and unsend. It reads like the messaging app you already use.</p>
+        </div>
+        <div class="card">
+          <p class="label">Encrypted photos</p>
+          <h3>Images never leave in the clear.</h3>
+          <p>A photo is encrypted in your browser before it uploads. The server only ever holds ciphertext; your partner's device does the rest.</p>
+        </div>
+        <div class="card">
+          <p class="label">Live, but quiet</p>
+          <h3>Presence without pressure.</h3>
+          <p>Typing and active cues when you're both there. Notifications stay generic — a nudge to look, never the words themselves.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 8. Limits ====== -->
+  <section class="slide" data-name="Limits">
+    <div class="slide-inner">
+      <p class="eyebrow">Built-in safety</p>
+      <h1 class="display" style="font-size: clamp(32px, 4.4vw, 50px);">Limits are part of the <span class="accent">grammar</span>, not a separate page.</h1>
+      <p class="body" style="margin-top: 12px; max-width: 760px;">A limit isn't a setting buried in preferences. It's saved alongside the Acts library, and every Ask is checked against it before it can be sent.</p>
+
+      <div class="limit-demo">
+        <div class="limit-row hard">
+          <p class="level">Hard no</p>
+          <p class="desc"><em>"filming — hard no."</em> Any Ask that turns filming on is <strong>blocked at draft time</strong>. The drafter sees the reason, edits, or can't send.</p>
+        </div>
+        <div class="limit-row talk">
+          <p class="level">Talk first</p>
+          <p class="desc"><em>"anal — talk first."</em> The Ask still sends, but it carries a badge: <strong>this one needs a real conversation before tonight</strong>.</p>
+        </div>
+        <div class="limit-row soft">
+          <p class="level">Soft limit</p>
+          <p class="desc"><em>"anything before 8am — soft."</em> A warning at send. The drafter has to acknowledge it. The Ask goes through if they do.</p>
+        </div>
+        <div class="limit-row yes">
+          <p class="level">Yes — with conditions</p>
+          <p class="desc"><em>"rough — yes, with conditions: lots of warm-up, never first."</em> The conditions surface <strong>inline on the recipient's view</strong> so they stay in front.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 9. The Pile ====== -->
+  <section class="slide" data-name="The Pile">
+    <div class="slide-inner">
+      <p class="eyebrow">Process flow · a game</p>
+      <h1 class="display" style="font-size: clamp(32px, 4.4vw, 50px);">The Pile finds <span class="accent">overlap</span> without either of you risking the ask.</h1>
+      <p class="body" style="margin-top: 10px; max-width: 760px;">Both partners drop acts into a shared pile, in private. Neither sees the other's drops. When both are ready, only the matches reveal.</p>
+
+      <div class="pile">
+        <div class="pile-side">
+          <p class="who">Partner A · their pile</p>
+          <div class="stack">
+            <div class="act">shower together</div>
+            <div class="act">fingered during the movie</div>
+            <div class="act">go down on me, slow</div>
+            <div class="act">anal — lots of warm-up</div>
+          </div>
+          <p class="body" style="font-size: 12px;">A drops freely. B can't see any of this yet.</p>
+        </div>
+        <div class="pile-side">
+          <p class="who">Partner B · their pile</p>
+          <div class="stack">
+            <div class="act hidden">private</div>
+            <div class="act hidden">private</div>
+            <div class="act hidden">private</div>
+            <div class="act hidden">private</div>
+          </div>
+          <p class="body" style="font-size: 12px;">B is doing the same thing, on their own.</p>
+        </div>
+      </div>
+
+      <div class="pile-arrow">↓  both lock in  ↓</div>
+
+      <div class="pile-side" style="max-width: 520px; margin: 0 auto;">
+        <p class="who" style="color: var(--ss-rose);">The reveal · only the matches</p>
+        <div class="stack">
+          <div class="act match">shower together</div>
+          <div class="act match">fingered during the movie</div>
+        </div>
+        <p class="body" style="font-size: 12.5px;">A's other two drops <strong>stay private to A</strong>. The non-matches never surface. Nobody has to admit to wanting something the other didn't want.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== Reveals: Quiz / Green Lights / Blind Reveal ====== -->
+  <section class="slide" data-name="Reveals">
+    <div class="slide-inner">
+      <p class="eyebrow">A family of games · answer first, compare second</p>
+      <h1 class="display" style="font-size: clamp(30px, 4.2vw, 48px);">Three more ways to find a <span class="accent">yes you both already have</span>.</h1>
+      <p class="body" style="margin-top: 10px; max-width: 780px;">Same idea as the Pile, different shapes. Each one has you answer on your own, then shows only what you have in common — so neither of you has to go first.</p>
+
+      <div class="feature-grid" style="margin-top: 26px;">
+        <div class="card">
+          <p class="label">Sex Quiz</p>
+          <h3>A shared deck.</h3>
+          <p>Both work through the same questions in private. The result surfaces only the matches — the acts you both said yes to.</p>
+        </div>
+        <div class="card">
+          <p class="label">Green Lights</p>
+          <h3>A standing menu.</h3>
+          <p>Mark each thing yes, curious, or not now, on your own. Where your lists overlap becomes a menu you can both act on.</p>
+        </div>
+        <div class="card">
+          <p class="label">Blind Reveal</p>
+          <h3>One prompt, two answers.</h3>
+          <p>A single question, both answer in private. Neither reply opens until both are in, so no answer sways the other.</p>
+        </div>
+      </div>
+
+      <p class="body" style="margin-top: 22px; max-width: 760px; font-size: 13px;">The rule they all share: <strong>your answer only becomes visible once your partner's is locked in too.</strong> A one-sided want stays private.</p>
+    </div>
+  </section>
+
+  <!-- ====== 10. Shelf / Vault / Inspiration ====== -->
+  <section class="slide" data-name="Shelf, Vault, Inspiration">
+    <div class="slide-inner">
+      <p class="eyebrow">Three places to keep things</p>
+      <h1 class="display" style="font-size: clamp(30px, 4vw, 44px);">Inspiration, the Shelf, and the Vault do <span class="accent">different jobs</span>.</h1>
+      <p class="body" style="margin-top: 10px; max-width: 760px;">A common mistake is to lump "things you save" into one bucket. They're not the same thing — and the app keeps them separated on purpose.</p>
+
+      <div class="feature-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 30px;">
+        <div class="card" style="background: var(--ss-surface-2);">
+          <p class="label">Inspiration</p>
+          <h3>Ideas, before plans.</h3>
+          <p>A fantasy you want to share. A kink to surface. The submission itself is the author's "I'm interested." A partner's "me too" makes it mutual — and only then.</p>
+        </div>
+        <div class="card" style="background: var(--ss-surface-2);">
+          <p class="label">The Shelf</p>
+          <h3>External, opt-in reveal.</h3>
+          <p>A link, a passage, a clip from somewhere else. Items open hidden — your partner chooses when to reveal. Both can react.</p>
+        </div>
+        <div class="card" style="background: var(--ss-surface-2);">
+          <p class="label">The Vault</p>
+          <h3>Yours, end-to-end encrypted.</h3>
+          <p>Clips, titles, comments — all encrypted in the browser with a passphrase the server never receives. Even a database breach can't read it.</p>
+        </div>
+      </div>
+
+      <div style="margin-top: 30px; padding: 18px 22px; background: var(--ss-surface); border: 1px solid var(--ss-hairline); border-radius: 14px;">
+        <p class="mono" style="margin-bottom: 8px;">The distinction that matters</p>
+        <p class="body" style="font-size: 14px;"><strong>Inspiration is for the unsaid.</strong> The Shelf is for the borrowed. The Vault is for the made. Three different moves, three different surfaces — so a fantasy doesn't get filed next to a recipe you both liked.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 11. Privacy architecture ====== -->
+  <section class="slide" data-name="Privacy architecture">
+    <div class="slide-inner">
+      <p class="eyebrow">How the privacy actually works</p>
+      <h1 class="display" style="font-size: clamp(30px, 4.2vw, 48px);">Discreet on the outside. <span class="accent">Encrypted underneath.</span></h1>
+      <p class="body" style="margin-top: 8px; max-width: 760px;">Privacy isn't a setting. It's the shape of the system. Different layers protect different things.</p>
+
+      <div class="two-col" style="grid-template-columns: 1.5fr 1fr; gap: 40px; margin-top: 18px;">
+        <div class="privacy-stack" style="margin-top: 0;">
+          <div class="privacy-layer">
+            <span class="layer-label">Public surface</span>
+            <p class="layer-body"><strong>Designed not to leak.</strong> Marketing pages, emails, push notifications, activity logs, and system messages stay generic. The lock screen never spoils what's inside.</p>
+          </div>
+          <div class="privacy-layer">
+            <span class="layer-label">Access</span>
+            <p class="layer-body"><strong>Two people, server-checked.</strong> No public feed, no profiles, no discovery. Private routes verify room membership server-side before any data comes back.</p>
+          </div>
+          <div class="privacy-layer">
+            <span class="layer-label">Shared-room data</span>
+            <p class="layer-body"><strong>Encrypted at rest.</strong> Asks, Acts, Limits, Inspiration, Shelf, activity, presence, push subs, audit logs — encrypted before they touch durable storage.</p>
+          </div>
+          <div class="privacy-layer">
+            <span class="layer-label">Private Vault</span>
+            <p class="layer-body"><strong>Encrypted in the browser, with your passphrase.</strong> The server never sees the passphrase. Vault media is also not sent to any AI-assisted features.</p>
+          </div>
+          <div class="privacy-layer">
+            <span class="layer-label">Your control</span>
+            <p class="layer-body"><strong>Export, sign out, delete.</strong> JSON export of profile and room data on demand. Room deletion is scheduled with a seven-day undo window before it purges.</p>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+          <div class="phone" style="width: min(240px, 100%); aspect-ratio: 9 / 19.5;">
+            <img loading="lazy" alt="Privacy controls" src="/docs/screenshots/share/21-privacy-data.png">
+          </div>
+          <p style="text-align: center; font-family: var(--ss-font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ss-cream-faint); line-height: 1.4;">
+            <span style="display: block; font-family: var(--ss-font-display); font-style: italic; font-size: 15px; letter-spacing: 0; text-transform: none; color: var(--ss-cream); margin-bottom: 2px; font-weight: 500;">In the app</span>
+            Inspectable, not just trusted
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 12. Hero — the actual app ====== -->
+  <section class="slide" data-name="The actual app">
+    <div class="slide-inner">
+      <div class="two-col">
+        <div class="hero-phone phone">
+          <img loading="lazy" alt="Sexboard home screen" src="/docs/screenshots/share/03-sexboard-home.png">
+        </div>
+        <div>
+          <p class="eyebrow">From inside the room</p>
+          <h1 class="display" style="font-size: clamp(30px, 4vw, 46px); margin-bottom: 18px;">This is what the <span class="accent">two of you</span> actually see.</h1>
+          <p class="body" style="margin-bottom: 14px;">Everything before this slide was the thinking. Same dark plum room, same rose accents, same italic Cormorant for the things that matter. The Sexboard greets you by name, surfaces what needs a response, and stays quiet otherwise.</p>
+          <p class="body">Built mobile-first as a PWA. Installs to the Home Screen. Push notifications stay generic on the lock screen — the body of any Ask, Idea, or Reveal lives only inside.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 13. Gallery — the full set ====== -->
+  <section class="slide" data-name="Through the flow">
+    <div class="slide-inner">
+      <p class="eyebrow" style="margin-bottom: 8px;">Through the flow</p>
+      <h1 class="display" style="font-size: clamp(24px, 3.2vw, 36px); margin-bottom: 0;">A few of the surfaces, <span class="accent">in order</span>.</h1>
+
+      <div class="shot-grid">
+        <div class="shot-tile">
+          <div class="phone"><img loading="lazy" alt="Health rhythm view" src="/docs/screenshots/share/17-health.png"></div>
+          <p class="cap"><strong>Health</strong>Your rhythm, in numbers</p>
+        </div>
+        <div class="shot-tile">
+          <div class="phone"><img loading="lazy" alt="Compose Ask" src="/docs/screenshots/share/07-new-ask.png"></div>
+          <p class="cap"><strong>New Ask</strong>Acts, timing, filming, note</p>
+        </div>
+        <div class="shot-tile">
+          <div class="phone"><img loading="lazy" alt="Ask detail" src="/docs/screenshots/share/05-ask-detail.png"></div>
+          <p class="cap"><strong>Ask, received</strong>Yes, counter, or pass</p>
+        </div>
+        <div class="shot-tile">
+          <div class="phone"><img loading="lazy" alt="Inspiration" src="/docs/screenshots/share/08-inspiration.png"></div>
+          <p class="cap"><strong>Inspiration</strong>Fantasies, before plans</p>
+        </div>
+        <div class="shot-tile">
+          <div class="phone"><img loading="lazy" alt="Shelf" src="/docs/screenshots/share/10-shelf.png"></div>
+          <p class="cap"><strong>Shelf</strong>Saved, hidden until revealed</p>
+        </div>
+        <div class="shot-tile">
+          <div class="phone"><img loading="lazy" alt="Pile revealed" src="/docs/screenshots/share/13-pile-revealed.png"></div>
+          <p class="cap"><strong>Pile, revealed</strong>Only the matches surface</p>
+        </div>
+        <div class="shot-tile">
+          <div class="phone"><img loading="lazy" alt="Limits" src="/docs/screenshots/share/15-limits.png"></div>
+          <p class="cap"><strong>Limits</strong>The shape of yes</p>
+        </div>
+        <div class="shot-tile">
+          <div class="phone"><img loading="lazy" alt="Private Vault" src="/docs/screenshots/share/18-private-vault.png"></div>
+          <p class="cap"><strong>Private Vault</strong>Encrypted, passphrase-locked</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== 14. Closer ====== -->
+  <section class="slide" data-name="Close">
+    <div class="slide-inner closer">
+      <svg style="width: 96px; margin: 0 auto 28px; opacity: 0.9;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path pathLength="1" d="M 12,50 C 22,30 38,30 50,50 C 62,70 78,70 88,50" fill="none" stroke="#e9a8b3" stroke-width="3.5" stroke-linecap="round"></path>
+        <path pathLength="1" d="M 12,62 C 22,42 38,42 50,62 C 62,82 78,82 88,62" fill="none" stroke="#e9a8b3" stroke-width="3.5" stroke-linecap="round" opacity="0.45"></path>
+      </svg>
+      <p class="eyebrow" style="text-align: center;">In one line</p>
+      <h1 class="display" style="font-size: clamp(40px, 6.5vw, 76px);">Get curious. <span class="accent">Get in sync.</span></h1>
+      <p class="lede" style="font-size: 22px; margin-top: 28px; max-width: 620px; margin-left: auto; margin-right: auto;">A private space for two — to ask clearly, share fantasies, save inspiration, and find each other's yes, without the awkward pause.</p>
+      <p class="sign"><span style="font-family: var(--ss-font-mono); letter-spacing: 0.18em; text-transform: uppercase;">your-host.example</span></p>
+    </div>
+  </section>
+
+</div>
+
+<div class="progress" id="progress"></div>
+<div class="nav-hint"><kbd>←</kbd> <kbd>→</kbd> · <kbd>space</kbd> · <kbd>1–9</kbd></div>
+
+<script>
+(function () {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  const slideName = document.getElementById('slide-name');
+  const slideNum = document.getElementById('slide-num');
+  const slideTotal = document.getElementById('slide-total');
+  const progress = document.getElementById('progress');
+  let i = 0;
+
+  slideTotal.textContent = String(total).padStart(2, '0');
+
+  function show(n) {
+    i = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, idx) => {
+      if (idx === i) {
+        // re-trigger CSS animations even when re-activating the same slide
+        s.classList.remove('is-active');
+        void s.offsetWidth;
+        s.classList.add('is-active');
+      } else {
+        s.classList.remove('is-active');
+      }
+    });
+    slideName.textContent = slides[i].dataset.name || '';
+    slideNum.textContent = String(i + 1).padStart(2, '0');
+    progress.style.width = (((i + 1) / total) * 100) + '%';
+    // preload neighbor slide images so the next nav is instant
+    [i - 1, i + 1].forEach((j) => {
+      if (j >= 0 && j < total) slides[j].querySelectorAll('img[loading="lazy"]').forEach((img) => { img.loading = 'eager'; });
+    });
+    if (history.replaceState) history.replaceState(null, '', '#' + (i + 1));
+  }
+
+  function next() { show(i + 1); }
+  function prev() { show(i - 1); }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') { e.preventDefault(); show(0); }
+    else if (e.key === 'End') { e.preventDefault(); show(total - 1); }
+    else if (/^[1-9]$/.test(e.key)) { e.preventDefault(); show(parseInt(e.key, 10) - 1); }
+    else if (e.key === '0') { e.preventDefault(); show(9); }
+  });
+
+  // click anywhere on the right half = next, left half = prev
+  let suppressTouchClickUntil = 0;
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('a, button, kbd')) return;
+    if (suppressTouchClickUntil > performance.now()) {
+      e.preventDefault();
+      return;
+    }
+    const half = window.innerWidth / 2;
+    if (e.clientX > half) next(); else prev();
+  });
+
+  // touch swipe only; taps should not advance the mobile deck
+  let touchStart = null;
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) {
+      touchStart = null;
+      return;
+    }
+    const touch = e.touches[0];
+    touchStart = { x: touch.clientX, y: touch.clientY };
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    if (!touchStart) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStart.x;
+    const dy = touch.clientY - touchStart.y;
+    const isHorizontalSwipe = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.25;
+    suppressTouchClickUntil = performance.now() + 700;
+    if (isHorizontalSwipe) {
+      e.preventDefault();
+      dx < 0 ? next() : prev();
+    }
+    touchStart = null;
+  }, { passive: false });
+
+  // deep link
+  const hash = parseInt(location.hash.replace('#', ''), 10);
+  if (!isNaN(hash) && hash >= 1 && hash <= total) show(hash - 1);
+  else show(0);
+})();
+</script>
+</body>
+</html>

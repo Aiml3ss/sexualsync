@@ -84,6 +84,21 @@ export default function MutualPage() {
     const count = clampCount(Number(privateCelebration?.count || params.get("count") || acts.length || 1), acts.length || 1);
     const requestId = params.get("requestId") || "";
     const narration = String(privateCelebration?.narration || params.get("narration") || "").trim().slice(0, MAX_NARRATION_LENGTH);
+    // Privacy: on the non-encrypted path the plaintext act names + narration
+    // arrive in the query string. They're captured in state now, so strip just
+    // those from THIS history entry — otherwise they persist in browser history
+    // and sync to the user's other signed-in devices. Keep the non-sensitive
+    // source/requestId (opaque ids the match-load still needs). The encrypted
+    // path already hands off via one-shot sessionStorage and carries nothing
+    // sensitive in the URL.
+    if (typeof window !== "undefined" && window.history?.replaceState) {
+      const keep = new URLSearchParams();
+      if (source) keep.set("source", source);
+      if (requestId) keep.set("requestId", requestId);
+      if (params.get("private") === "1") keep.set("private", "1");
+      const query = keep.toString();
+      window.history.replaceState(null, "", query ? `/mutual?${query}` : "/mutual");
+    }
     const nextCelebration = {
       source: ["pile", "ask", "shelf", "kink"].includes(source) ? source : "ask",
       acts,

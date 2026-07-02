@@ -37,8 +37,8 @@ const rootFiles = [
   "report.html",
   "dmca.html",
   "support.html",
+  "presentation.html",
   "app-icon.svg",
-  ".well-known/security.txt",
   "_headers",
 ];
 
@@ -152,7 +152,17 @@ function copyNextPreview() {
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
+function copyPresentationScreenshots() {
+  const presentation = fs.readFileSync(path.join(root, "presentation.html"), "utf8");
+  const screenshotPaths = new Set(
+    Array.from(presentation.matchAll(/src="\/(docs\/screenshots\/share\/[^"]+\.png)"/g))
+      .map((match) => match[1])
+  );
+  for (const file of screenshotPaths) copyFile(file);
+}
+
 for (const file of rootFiles) copyFile(file);
+copyPresentationScreenshots();
 
 // Rewrite the dist copy of sw.js so APP_VERSION reflects this build. The source
 // sw.js retains its placeholder constant so local dev still sees a stable name.

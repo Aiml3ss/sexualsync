@@ -6,6 +6,7 @@ import {
   pileDropCapMax,
   publicPile,
   randomPileMaxDropCount,
+  readPile,
 } from "../../functions/api/pile.js";
 import { mutatePlatformState } from "../../functions/api/_workspaces.js";
 import { mutateKey, readKey } from "../../functions/api/_state.js";
@@ -149,6 +150,25 @@ test("double-tapped lock derives exactly one session", async () => {
   const sessions = await readKey(e, STORE, "pile:w1:sessions");
   assert.equal(sessions.length, 1, "exactly one locked session persisted");
   assert.equal(await readKey(e, STORE, "pile:w1:active"), null, "active pile cleared");
+});
+
+test("ending a pile clears the strong-read mirror, so it does not resurrect", async () => {
+  const e = await setupPileEnv();
+  const revealAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  await callPile(e, "POST", { workspaceId: "w1", action: "start", revealAt });
+  await callPile(e, "POST", { workspaceId: "w1", action: "drop", label: "Kiss" });
+
+  const ended = await callPile(e, "POST", { workspaceId: "w1", action: "end" });
+  assert.equal(ended.status, 200);
+
+  // readPile goes through readKeyStrong (the CAS coordinator's mirror). Before
+  // the fix, `end`/`decline`/`lock` deleted only the raw KV key and left the
+  // mirror holding the pile, so this strong read resurrected the ended pile.
+  assert.equal(await readPile(e, "w1"), null, "ended pile must not resurrect via the strong read");
+
+  // And a fresh start must succeed rather than 409 on the ghost pile.
+  const restart = await callPile(e, "POST", { workspaceId: "w1", action: "start", revealAt });
+  assert.equal(restart.status, 200, "start after end must not 409 on a resurrected pile");
 });
 
 // --- pure drop-cap math (previously only exercised indirectly) ---

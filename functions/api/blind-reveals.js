@@ -74,10 +74,6 @@ async function readList(env, key) {
   }
 }
 
-async function writeList(env, key, list, limit) {
-  await store(env).setJSON(key, list.slice(0, limit));
-}
-
 // Per-workspace reveals read with a read-only fallback to the legacy global key
 // (filtered to this workspace) so nothing disappears before the migration runs.
 // Reveals are always scoped to a single workspace here, so no cross-workspace
@@ -235,9 +231,18 @@ export async function readBlindRevealResponse(env, workspace, actorEmail, now = 
     .map(migrateReveal)
     .map((reveal) => reveal.workspaceId === workspace.id ? revealIfComplete(reveal, workspace, now) : reveal);
   if (JSON.stringify(rawReveals) !== JSON.stringify(reveals)) {
-    // Persist auto-reveal transitions to THIS workspace's key (adopting any
-    // legacy rows surfaced via the fallback on first write).
-    await writeList(env, revealsKey(workspace.id), reveals, MAX_REVEALS);
+    // Persist auto-reveal transitions through a CAS transform, not a raw
+    // writeList (which could clobber a partner's concurrent submit). Re-run the
+    // reveal pipeline on the FRESH per-workspace value so a submit landed since
+    // our union read is composed on, not overwritten. The response list above
+    // still comes from the union read, so nothing drops from the history view.
+    await mutateKey(env, STORE_NAME, revealsKey(workspace.id), (current) => {
+      const base = Array.isArray(current) && current.length ? current : reveals;
+      const next = base
+        .map(migrateReveal)
+        .map((reveal) => reveal.workspaceId === workspace.id ? revealIfComplete(reveal, workspace, now) : reveal);
+      return { value: next.slice(0, MAX_REVEALS), write: JSON.stringify(base) !== JSON.stringify(next) };
+    });
   }
   const activeReveal = pickActiveReveal(reveals, workspace.id);
   return {
@@ -314,18 +319,6 @@ export async function onRequest(context) {
   const action = cleanText(payload.action, 40) || "create";
 
   if (action === "create") {
-    let reveals = (await readRevealsForWorkspace(context.env, workspace.id))
-      .map(migrateReveal)
-      .map((reveal) => reveal.workspaceId === workspace.id ? revealIfComplete(reveal, workspace, now) : reveal);
-    const existingActive = pickActiveReveal(reveals, workspace.id);
-    if (existingActive && existingActive.status !== "archived") {
-      return jsonResponse(200, {
-        workspaceId: workspace.id,
-        activeReveal: publicReveal(existingActive, workspace, actorEmail),
-        reveal: publicReveal(existingActive, workspace, actorEmail),
-      });
-    }
-
     const encryptedPrompt = cleanRoomEncryptedBox(payload.encryptedPrompt, 12000);
     if (roomE2eeRequired(workspace) && !encryptedPrompt) {
       return jsonResponse(400, { error: "Room Encryption requires an encrypted Blind Reveal prompt." });
@@ -344,8 +337,28 @@ export async function onRequest(context) {
       archivedAt: "",
     };
     if (encryptedPrompt) reveal.encryptedPrompt = encryptedPrompt;
-    reveals = [reveal, ...reveals].slice(0, MAX_REVEALS);
-    await writeList(context.env, revealsKey(workspace.id), reveals, MAX_REVEALS);
+    // Prepend atomically against a fresh snapshot (was a raw writeList that could
+    // drop a partner's concurrent submit). The active-reveal guard runs INSIDE
+    // the transform so two simultaneous creates can't both open a reveal. Seed
+    // read-only from the legacy list when the per-workspace key is still empty.
+    const createSeed = await legacyRevealsSeedFor(context.env, workspace.id);
+    const created = await mutateKey(context.env, STORE_NAME, revealsKey(workspace.id), (current) => {
+      const list = (Array.isArray(current) && current.length ? current : createSeed)
+        .map(migrateReveal)
+        .map((r) => r.workspaceId === workspace.id ? revealIfComplete(r, workspace, now) : r);
+      const active = pickActiveReveal(list, workspace.id);
+      if (active && active.status !== "archived") {
+        return { write: false, result: { created: false, reveal: active } };
+      }
+      return { value: [reveal, ...list].slice(0, MAX_REVEALS), result: { created: true, reveal } };
+    });
+    if (!created.created) {
+      return jsonResponse(200, {
+        workspaceId: workspace.id,
+        activeReveal: publicReveal(created.reveal, workspace, actorEmail),
+        reveal: publicReveal(created.reveal, workspace, actorEmail),
+      });
+    }
     await appendAudit(context.env, workspace.id, {
       type: "blind_reveal_created",
       actorEmail,
@@ -509,16 +522,28 @@ export async function onRequest(context) {
   }
 
   if (action === "archive") {
-    const nextReveal = {
-      ...reveal,
-      status: "archived",
-      archivedAt: now,
-      archivedByEmail: actorEmail,
-      archivedByName: actorName,
-      updatedAt: now,
-    };
-    reveals = reveals.map((item, itemIdx) => itemIdx === index ? nextReveal : item);
-    await writeList(context.env, revealsKey(workspace.id), reveals, MAX_REVEALS);
+    // Flip to archived atomically against a fresh snapshot (was a raw writeList
+    // that could drop a partner's concurrent submit/promote on the same list).
+    const archiveSeed = await legacyRevealsSeedFor(context.env, workspace.id);
+    const archiveResult = await mutateKey(context.env, STORE_NAME, revealsKey(workspace.id), (current) => {
+      const list = (Array.isArray(current) && current.length ? current : archiveSeed)
+        .map(migrateReveal)
+        .map((r) => r.workspaceId === workspace.id ? revealIfComplete(r, workspace, now) : r);
+      const i = list.findIndex((r) => r.id === revealId && r.workspaceId === workspace.id);
+      if (i === -1) return { write: false, result: null };
+      const archived = {
+        ...list[i],
+        status: "archived",
+        archivedAt: now,
+        archivedByEmail: actorEmail,
+        archivedByName: actorName,
+        updatedAt: now,
+      };
+      const value = list.map((item, idx) => idx === i ? archived : item).slice(0, MAX_REVEALS);
+      return { value, result: { reveal: archived, list: value } };
+    });
+    if (!archiveResult) return jsonResponse(404, { error: "Blind reveal not found." });
+    const nextReveal = archiveResult.reveal;
     await appendAudit(context.env, workspace.id, {
       type: "blind_reveal_archived",
       actorEmail,
@@ -536,7 +561,7 @@ export async function onRequest(context) {
 
     return jsonResponse(200, {
       workspaceId: workspace.id,
-      activeReveal: publicReveal(pickActiveReveal(reveals, workspace.id), workspace, actorEmail),
+      activeReveal: publicReveal(pickActiveReveal(archiveResult.list, workspace.id), workspace, actorEmail),
       reveal: publicReveal(nextReveal, workspace, actorEmail),
     });
   }
