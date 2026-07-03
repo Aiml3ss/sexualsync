@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#170a10">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Sexualsync">
+  <title>Sexualsync · Done</title>
+  <link rel="icon" href="/app-icon.svg">
+  <link rel="apple-touch-icon" href="/app-icon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: var(--ss-cream);
+      --muted: var(--ss-cream-muted);
+      --paper: var(--ss-bg);
+      --panel: var(--ss-surface);
+      --line: var(--ss-hairline);
+      --accent: var(--ss-rose);
+      --accent-hover: var(--ss-rose-deep);
+      --radius: 10px;
+      font-family: var(--ss-font-body);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 12% 8%, var(--ss-rose-fog), transparent 38%),
+        radial-gradient(circle at 88% 92%, var(--ss-counter-fog), transparent 42%),
+        var(--paper);
+      color: var(--ink);
+      line-height: 1.5;
+      padding: 32px 18px;
+      font-family: inherit;
+    }
+
+    main {
+      max-width: 480px;
+      width: 100%;
+      padding: 36px 32px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--ss-shadow-floating);
+      text-align: center;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: var(--ss-rose-fog);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 16px 0 12px;
+      font-size: clamp(1.8rem, 5vw, 2.4rem);
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 24px;
+      color: var(--muted);
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 22px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: var(--ss-ink);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    a:hover { background: var(--accent-hover); }
+  </style>
+  <link rel="stylesheet" href="/brand/tokens/brand-tokens.css">
+</head>
+<body>
+  <main>
+    <span class="eyebrow">Sexualsync</span>
+    <h1 id="successTitle">Done</h1>
+    <p id="successMessage">Your update is saved privately and your partner will see it on their dashboard.</p>
+    <a href="/">Back to your space</a>
+  </main>
+  <script>
+    const stage = new URLSearchParams(window.location.search).get("stage");
+    if (stage === "review") {
+      document.querySelector("#successTitle").textContent = "Review sent";
+      document.querySelector("#successMessage").textContent = "Your review is on its way back to your partner.";
+    } else if (stage === "request") {
+      document.querySelector("#successTitle").textContent = "Request sent";
+      document.querySelector("#successMessage").textContent = "Your request is waiting for your partner's review.";
+    } else if (stage === "invite") {
+      document.querySelector("#successTitle").textContent = "Invite sent";
+      document.querySelector("#successMessage").textContent = "Your partner has been emailed an invite.";
+    }
+  </script>
+</body>
+</html>

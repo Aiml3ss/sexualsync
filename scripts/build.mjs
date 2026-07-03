@@ -120,8 +120,24 @@ const nextPreviewFiles = [
   path.join("space", "vault.rsc"),
 ];
 
-function copyFile(relativePath) {
+// Root assets that only exist on the Cloudflare edition (Pages routing) or are
+// produced by an internal signing step the self-host edition doesn't carry.
+// The self-host repo is a curated subset (see scripts/publish-selfhost.mjs), so
+// these can be legitimately absent — skip them with a warning instead of failing
+// the whole build. Every OTHER root file is required and still throws if missing.
+const OPTIONAL_ROOT_FILES = new Set([
+  ".well-known/security.txt",
+  ".well-known/code-transparency-key.json",
+  "_routes.json", // Cloudflare Pages route manifest — no meaning on the Node server.
+  "_redirects", // Cloudflare Pages redirects — handled by the reverse proxy on self-host.
+]);
+
+function copyFile(relativePath, { optional = false } = {}) {
   const source = path.join(root, relativePath);
+  if (optional && !fs.existsSync(source)) {
+    console.warn(`build: skipping optional asset absent on this edition: ${relativePath}`);
+    return;
+  }
   const target = path.join(dist, relativePath);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(source, target);
@@ -167,7 +183,7 @@ function copyNextPreview() {
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
-for (const file of rootFiles) copyFile(file);
+for (const file of rootFiles) copyFile(file, { optional: OPTIONAL_ROOT_FILES.has(file) });
 
 // Rewrite the dist copy of sw.js so APP_VERSION reflects this build. The source
 // sw.js retains its placeholder constant so local dev still sees a stable name.
@@ -191,10 +207,18 @@ copyDir(path.join(root, "brand", "wordmark"), path.join(dist, "brand", "wordmark
 copyPresentationScreenshots();
 copyNextPreview();
 
-execFileSync(process.execPath, ["scripts/generate-code-transparency.mjs", "--app-version", APP_VERSION_TAG], {
-  stdio: "inherit",
-  env: {
-    ...process.env,
-    APP_VERSION_TAG
-  }
-});
+// Code-transparency signing is a Cloudflare-edition step (its generator + signing
+// key are internal-only and not published to the self-host subset). Run it when
+// present; skip with a warning when the self-host edition doesn't carry it.
+const transparencyGenerator = path.join(root, "scripts", "generate-code-transparency.mjs");
+if (fs.existsSync(transparencyGenerator)) {
+  execFileSync(process.execPath, [transparencyGenerator, "--app-version", APP_VERSION_TAG], {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      APP_VERSION_TAG
+    }
+  });
+} else {
+  console.warn("build: skipping code-transparency manifest (generator not present in this edition).");
+}
