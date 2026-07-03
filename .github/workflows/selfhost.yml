@@ -12,6 +12,18 @@ on:
       - "functions/**"
       - "docs/self-host/**"
       - "scripts/selfhost-config-check.mjs"
+      # Inputs to `npm run selfhost:build` — a break in any of these takes down
+      # the self-host build, so they must trigger this CI (previously only
+      # package.json/Dockerfile did, so a web-only or build.mjs break could ship
+      # to the public self-host repo unverified).
+      - "web/**"
+      - "scripts/build.mjs"
+      - "brand/**"
+      - "*.html"
+      - "legal.css"
+      - "sw.js"
+      - "manifest.webmanifest"
+      - "app-icon.svg"
       - "_headers"
       - "_middleware.js"
       - "package.json"
