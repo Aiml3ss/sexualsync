@@ -166,9 +166,18 @@ if (exists("package.json")) {
   ["selfhost:check", "selfhost:build", "selfhost:serve", "selfhost:smoke", "selfhost:test"].forEach((s) => {
     assert(pkg.scripts && pkg.scripts[s], `package.json missing script: ${s}`);
   });
+  // The Cloudflare deploy chain only exists on the Cloudflare edition. The public
+  // self-host subset intentionally strips the `deploy` script and wrangler.toml,
+  // so only enforce the deploy-chain invariants where that chain is present.
   const deploy = pkg.scripts?.deploy || "";
-  assert(deploy.includes("wrangler pages deploy"), "deploy script must remain the Cloudflare Pages deploy.");
-  assert(!/selfhost/i.test(deploy), "Cloudflare deploy chain must NOT reference self-host scripts.");
+  if (exists("wrangler.toml")) {
+    assert(deploy.includes("wrangler pages deploy"), "deploy script must remain the Cloudflare Pages deploy.");
+    assert(!/selfhost/i.test(deploy), "Cloudflare deploy chain must NOT reference self-host scripts.");
+  } else {
+    // Self-host subset: a deploy script should not be present, but if one is it
+    // still must not pull in self-host scripts.
+    assert(!/selfhost/i.test(deploy), "deploy chain must NOT reference self-host scripts.");
+  }
 }
 
 if (failures.length) {
