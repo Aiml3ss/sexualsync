@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { encodeFrame, FrameParser, OPCODES, acceptKey } from "../lib/ws-protocol.mjs";
+import { encodeFrame, FrameParser, OPCODES, acceptKey, MAX_INBOUND_FRAME_BYTES } from "../lib/ws-protocol.mjs";
 import { RoomRegistry, createRoomsNamespace } from "../lib/ws-room.mjs";
 
 // Build a masked client->server frame the way a browser does.
@@ -43,6 +43,42 @@ test("encodeFrame round-trips back through the parser (server frame unmasked)", 
   let got = null;
   parser.push(encodeFrame(OPCODES.TEXT, Buffer.from("server says hi")), { onMessage: (m) => { got = m; } });
   assert.equal(got, "server says hi");
+});
+
+test("FrameParser goes dead on an oversized declared length without allocating it", () => {
+  // A crafted header declaring a huge 64-bit length must not make the parser
+  // buffer toward it (memory-exhaustion shape) — it reports oversized off the
+  // header alone and ignores everything after.
+  const header = Buffer.alloc(14);
+  header[0] = 0x80 | OPCODES.TEXT;
+  header[1] = 0x80 | 127; // masked + 64-bit extended length
+  header.writeBigUInt64BE(BigInt(1024 * 1024 * 1024), 2);
+  const parser = new FrameParser();
+  let oversized = 0;
+  let got = null;
+  const handlers = { onMessage: (m) => { got = m; }, onOversized: () => { oversized += 1; } };
+  parser.push(header, handlers);
+  assert.equal(oversized, 1);
+  assert.equal(parser.dead, true);
+  assert.equal(parser.buf.length, 0, "buffered bytes must be released");
+  // Anything pushed after the violation is ignored.
+  parser.push(clientFrame(OPCODES.TEXT, "after"), handlers);
+  assert.equal(got, null);
+  assert.equal(oversized, 1);
+});
+
+test("FrameParser caps fragmented-message accumulation, not just single frames", () => {
+  const parser = new FrameParser();
+  let oversized = 0;
+  let got = null;
+  const handlers = { onMessage: (m) => { got = m; }, onOversized: () => { oversized += 1; } };
+  const chunk = "x".repeat(60 * 1024);
+  parser.push(clientFrame(OPCODES.TEXT, chunk, false), handlers); // 60 KB, under the cap
+  assert.equal(oversized, 0);
+  parser.push(clientFrame(OPCODES.CONT, chunk, true), handlers); // total 120 KB > cap
+  assert.equal(oversized, 1);
+  assert.equal(got, null);
+  assert.ok(MAX_INBOUND_FRAME_BYTES >= 16 * 1024, "cap keeps generous headroom over the 4 KB event cap");
 });
 
 test("FrameParser handles a frame split across TCP chunks", () => {

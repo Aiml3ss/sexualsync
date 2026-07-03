@@ -104,7 +104,7 @@ Status legend: **Not started** · **In progress** · **Done**.
    **PolyForm Noncommercial License 1.0.0** (`/LICENSE`). Noncommercial and
    personal self-hosting are permitted; commercial/hosted-service use and the
    Sexualsync brand remain reserved to the copyright holder. Commercial license
-   inquiries go to the copyright holder through the project's source repository.
+   inquiries: hello@sexualsync.io.
 
 ## Definition of done (per adapter)
 

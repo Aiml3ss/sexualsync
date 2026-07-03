@@ -596,7 +596,7 @@ export default {
   async scheduled(_controller, env, ctx) {
     const token = clean(env.PILE_REMINDER_RUNNER_TOKEN, 240);
     if (!token) return;
-    const url = clean(env.PILE_REMINDER_RUNNER_URL || "https://example.com/api/pile-reminders", 240);
+    const url = clean(env.PILE_REMINDER_RUNNER_URL || "https://sexualsync.io/api/pile-reminders", 240);
     ctx.waitUntil(fetch(url, {
       method: "POST",
       headers: {

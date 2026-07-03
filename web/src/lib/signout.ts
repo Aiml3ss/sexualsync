@@ -11,6 +11,7 @@
 
 import { clearAllNamespacedLocalState } from "./local-storage-sweep";
 import { markIntentionalSignOut } from "./auth-state";
+import { clearChatImageBlobCache } from "./api";
 import { clearRoomE2eeKeyCache } from "./room-crypto";
 import { clearVaultKeyCache } from "./vault-crypto";
 import { clearResourceCache } from "./resource-cache";
@@ -51,6 +52,7 @@ export function prepareSignOut(): void {
   clearRoomE2eeKeyCache();
   clearVaultKeyCache();
   clearResourceCache();
+  clearChatImageBlobCache();
   clearOfflineQueueDb();
   clearAppBadge();
   markIntentionalSignOut();

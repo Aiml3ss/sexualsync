@@ -22,12 +22,12 @@ function env() {
 }
 
 function request(body) {
-  return new Request("https://example.com/api/auth/email/verify", {
+  return new Request("https://sexualsync.io/api/auth/email/verify", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "cf-connecting-ip": "203.0.113.10",
-      origin: "https://example.com",
+      origin: "https://sexualsync.io",
     },
     body: JSON.stringify(body),
   });
@@ -97,7 +97,7 @@ test("email verify endpoint mints the same HttpOnly app session cookie", async (
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Lax/);
 
-  const session = await verifyAppSession(new Request("https://example.com/", {
+  const session = await verifyAppSession(new Request("https://sexualsync.io/", {
     headers: { cookie },
   }), testEnv);
   assert.equal(session.email, "person@example.com");
@@ -108,12 +108,12 @@ test("email sign-in start is closed by default outside private preview allowlist
   const testEnv = env();
   const response = await startEmailSignIn({
     env: testEnv,
-    request: new Request("https://example.com/api/auth/email/start", {
+    request: new Request("https://sexualsync.io/api/auth/email/start", {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "cf-connecting-ip": "203.0.113.11",
-        origin: "https://example.com",
+        origin: "https://sexualsync.io",
       },
       body: JSON.stringify({ email: "stranger@example.com", returnTo: "/sexboard" }),
     }),
@@ -241,7 +241,7 @@ test("private-preview mode rejects stale app sessions outside the owner room", a
   });
   const identity = await getAuthenticatedIdentity({
     env: testEnv,
-    request: new Request("https://example.com/api/bootstrap", {
+    request: new Request("https://sexualsync.io/api/bootstrap", {
       headers: { cookie: `sxs-session=${encodeURIComponent(sessionToken)}` },
     }),
   });

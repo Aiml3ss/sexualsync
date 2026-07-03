@@ -3,19 +3,22 @@ import { fileURLToPath } from "node:url";
 
 /** @type {import('next').NextConfig} */
 
-// In a self-host deployment the Next app and the API handlers are served from
-// the same origin by the Node server (`selfhost/server.mjs`); `/api/*` is
-// handled there and no rewrite is needed.
+// In production, the Next app and the Cloudflare Pages Functions live at the
+// same origin (sexualsync.io). `/api/*` is served by `functions/api/*.js`.
 //
-// In local UI dev (`npm run dev` inside web/), Next runs at
-// http://localhost:3000 and does not serve the API — so we proxy `/api/*` to a
-// locally running self-host server. Start that server (`npm run selfhost:serve`,
-// default port 8788) in another terminal, then the proxied API calls resolve.
+// In local dev (`npm run dev`), Next runs at http://localhost:3000 and the
+// API doesn't exist locally — so we proxy `/api/*` to the deployed Pages
+// origin. Auth in dev: the deployed origin is behind Cloudflare Access, so
+// these requests will return 302 to a Google login unless the developer
+// already has a `CF_Authorization` cookie for sexualsync.io. The simplest
+// path: sign in at https://sexualsync.io once in your browser, then `next
+// dev` will surface 302s in the network tab — for real API testing, set
+// `API_PROXY_TARGET=http://localhost:8788` (wrangler dev) instead.
 //
-// Override the target with the API_PROXY_TARGET env var to point at a different
-// host or port.
+// Override with API_PROXY_TARGET env var for testing against wrangler dev or
+// a preview deploy.
 
-const API_PROXY_TARGET = process.env.API_PROXY_TARGET || "http://localhost:8788";
+const API_PROXY_TARGET = process.env.API_PROXY_TARGET || "https://sexualsync.io";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig = {

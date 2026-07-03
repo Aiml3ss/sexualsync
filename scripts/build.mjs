@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 
 const root = process.cwd();
 const dist = path.join(root, "dist");
@@ -31,15 +31,20 @@ const rootFiles = [
   "legal.css",
   "sw.js",
   "manifest.webmanifest",
+  "presentation.html",
   "offline.html",
+  "thank-you.html",
   "privacy.html",
   "terms.html",
   "report.html",
   "dmca.html",
   "support.html",
-  "presentation.html",
   "app-icon.svg",
+  ".well-known/security.txt",
+  ".well-known/code-transparency-key.json",
   "_headers",
+  "_routes.json",
+  "_redirects",
 ];
 
 const nextPreviewFiles = [
@@ -128,6 +133,16 @@ function copyDir(source, target) {
   fs.cpSync(source, target, { recursive: true });
 }
 
+function copyPresentationScreenshots() {
+  const presentation = fs.readFileSync(path.join(root, "presentation.html"), "utf8");
+  const screenshotPaths = new Set(
+    Array.from(presentation.matchAll(/src="\/(docs\/screenshots\/share\/[^"]+\.png)"/g))
+      .map((match) => match[1])
+  );
+
+  for (const file of screenshotPaths) copyFile(file);
+}
+
 function copyNextPreview() {
   const previewRoot = nextServerApp;
   if (!fs.existsSync(previewRoot)) {
@@ -152,17 +167,7 @@ function copyNextPreview() {
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
-function copyPresentationScreenshots() {
-  const presentation = fs.readFileSync(path.join(root, "presentation.html"), "utf8");
-  const screenshotPaths = new Set(
-    Array.from(presentation.matchAll(/src="\/(docs\/screenshots\/share\/[^"]+\.png)"/g))
-      .map((match) => match[1])
-  );
-  for (const file of screenshotPaths) copyFile(file);
-}
-
 for (const file of rootFiles) copyFile(file);
-copyPresentationScreenshots();
 
 // Rewrite the dist copy of sw.js so APP_VERSION reflects this build. The source
 // sw.js retains its placeholder constant so local dev still sees a stable name.
@@ -183,4 +188,13 @@ if (fs.existsSync(swDistPath)) {
 copyDir(path.join(root, "brand", "marks"), path.join(dist, "brand", "marks"));
 copyDir(path.join(root, "brand", "tokens"), path.join(dist, "brand", "tokens"));
 copyDir(path.join(root, "brand", "wordmark"), path.join(dist, "brand", "wordmark"));
+copyPresentationScreenshots();
 copyNextPreview();
+
+execFileSync(process.execPath, ["scripts/generate-code-transparency.mjs", "--app-version", APP_VERSION_TAG], {
+  stdio: "inherit",
+  env: {
+    ...process.env,
+    APP_VERSION_TAG
+  }
+});

@@ -144,10 +144,15 @@ export async function frameFromVideo(video: HTMLVideoElement) {
   if (!context) throw new Error("Couldn't capture this frame.");
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
   return new Promise<Blob>((resolve, reject) => {
+    // JPEG, not PNG: a 1080p video frame is ~1.5-4 MB as PNG (where the
+    // quality arg is silently ignored) vs ~150-400 KB as JPEG q0.92 — a
+    // 5-10× saving on upload, storage, and every re-download. Frames
+    // captured before this change are still PNG; the decrypt path sniffs
+    // the magic bytes so both render with an accurate type.
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
       else reject(new Error("Couldn't capture this frame."));
-    }, "image/png", 0.92);
+    }, "image/jpeg", 0.92);
   });
 }
 

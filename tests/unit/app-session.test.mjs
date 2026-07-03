@@ -10,7 +10,7 @@ import { makeKvEnv, makeSessionToken } from "./helpers.mjs";
 
 const SECRET = "x".repeat(40);
 const env = { APP_SESSION_SECRET: SECRET };
-const reqWith = (cookie) => new Request("https://example.com/", { headers: { cookie } });
+const reqWith = (cookie) => new Request("https://sexualsync.io/", { headers: { cookie } });
 
 test("valid session round-trips and normalizes the email", async () => {
   const token = await createAppSessionToken(env, { email: "A@B.com", name: "Alex" });

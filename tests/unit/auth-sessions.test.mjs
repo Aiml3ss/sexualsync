@@ -20,7 +20,7 @@ async function requestWithSession(env, body) {
   if (body) headers["content-type"] = "application/json";
   return {
     token,
-    request: new Request("https://example.com/api/auth/sessions", {
+    request: new Request("https://sexualsync.io/api/auth/sessions", {
       method: body ? "POST" : "GET",
       headers,
       body: body ? JSON.stringify(body) : undefined
@@ -48,7 +48,7 @@ test("session endpoint can revoke all app sessions for the user", async () => {
   assert.equal(response.headers.get("set-cookie")?.startsWith("sxs-session=;"), true);
   assert.deepEqual(await response.json(), { ok: true, revoked: "all" });
 
-  const stale = new Request("https://example.com/", {
+  const stale = new Request("https://sexualsync.io/", {
     headers: { cookie: `sxs-session=${encodeURIComponent(token)}` }
   });
   assert.equal(await verifyAppSession(stale, e), null);

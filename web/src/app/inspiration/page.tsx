@@ -336,6 +336,8 @@ function InspirationReady({
   );
 }
 
+const KINK_LIBRARY_PAGE = 50;
+
 function KinkLibrary({
   kinks,
   auth,
@@ -355,6 +357,10 @@ function KinkLibrary({
   const [archiving, setArchiving] = useState(false);
   const [progress, setProgress] = useState(0);
   const [archiveError, setArchiveError] = useState("");
+  // Page the card list: the server caps ideas at 300, and mounting 300
+  // KinkCards (~7,500 DOM nodes) inside a CLOSED <details> cost every
+  // Inspiration visit the full render + a 300-way entry animation on open.
+  const [shownCount, setShownCount] = useState(KINK_LIBRARY_PAGE);
 
   const myEmail = normalizeEmail(auth.email);
   // Archiving is author-scoped, so only the user's own kinks are selectable —
@@ -483,19 +489,36 @@ function KinkLibrary({
         </div>
       )}
 
-      <ul className="kink-list kink-library-list">
-        {kinks.map((kink) => (
-          <KinkCard
-            key={kink.id}
-            kink={kink}
-            auth={auth}
-            workspace={workspace}
-            selectable={selectMode && canArchive(kink)}
-            selected={selectedIds.has(kink.id)}
-            onToggleSelect={() => toggleSelect(kink.id)}
-          />
-        ))}
-      </ul>
+      {/* Render the cards only while the panel is actually open — children of
+          a closed <details> still cost the full React render + DOM. */}
+      {(isOpen || selectMode) && (
+        <>
+          <ul className="kink-list kink-library-list">
+            {kinks.slice(0, shownCount).map((kink) => (
+              <KinkCard
+                key={kink.id}
+                kink={kink}
+                auth={auth}
+                workspace={workspace}
+                selectable={selectMode && canArchive(kink)}
+                selected={selectedIds.has(kink.id)}
+                onToggleSelect={() => toggleSelect(kink.id)}
+              />
+            ))}
+          </ul>
+          {kinks.length > shownCount && (
+            <div className="kink-library-more">
+              <button
+                type="button"
+                className="chip pressable"
+                onClick={() => setShownCount((count) => count + KINK_LIBRARY_PAGE)}
+              >
+                Show more ({kinks.length - shownCount} left)
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </details>
   );
 }
@@ -616,7 +639,12 @@ function KinkComposer({
       skipNextDraftWrite.current = false;
       return;
     }
-    void writeKinkDraft(workspaceId, text);
+    // Debounced: this used to AES-encrypt + synchronously setItem on every
+    // keystroke. A trailing 500ms write keeps the draft durable without the
+    // per-character main-thread hit; worst case on a hard close is losing
+    // the final half-second of typing.
+    const timer = window.setTimeout(() => { void writeKinkDraft(workspaceId, text); }, 500);
+    return () => window.clearTimeout(timer);
   }, [text, workspaceId]);
 
   async function submit(event: FormEvent) {

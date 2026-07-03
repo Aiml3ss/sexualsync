@@ -126,7 +126,7 @@ async function buildVapidJwt(env, audience) {
   if (cached && cached.exp - now > VAPID_JWT_REUSE_MARGIN_S) return cached.jwt;
 
   const { key } = await importVapidKeys(env);
-  const subject = env.VAPID_SUBJECT || "mailto:admin@localhost";
+  const subject = env.VAPID_SUBJECT || "mailto:hello@mail.sexualsync.io";
   const header = { typ: "JWT", alg: "ES256" };
   const exp = now + VAPID_JWT_TTL_S;
   const payload = { aud: audience, exp, sub: subject };

@@ -901,6 +901,19 @@ export async function remindAsk(payload: {
   }));
 }
 
+// "Maybe" — the reviewer defers a first answer. Not a final decision: the Ask
+// stays repliable so replyToRequest ("Decide now") can still convert it later.
+// Queueable + idempotent like a reply so a mid-send signal drop doesn't lose it.
+export async function maybeAsk(payload: {
+  workspaceId: string;
+  id: string;
+}): Promise<{ request?: RequestRecord; emailResult?: unknown } & RequestBoardResponse> {
+  return decryptRequestBoardResponse(await request<{ request?: RequestRecord; emailResult?: unknown } & RequestBoardResponse>("/api/request-board", {
+    method: "PATCH",
+    body: JSON.stringify({ ...payload, action: "maybe" }),
+  }, undefined, { queueable: true, intent: "ask:maybe" }));
+}
+
 export async function replyToRequest(payload: {
   workspaceId: string;
   id: string;
@@ -1055,6 +1068,38 @@ export async function getChatImageBlob(payload: { workspaceId: string; media: Ch
   if (!media.key || !media.iv) throw new Error("This image is locked — unlock Room Encryption to view it.");
   const enc = await requestBlob(`/api/chat-media?workspaceId=${encodeURIComponent(workspaceId)}&id=${encodeURIComponent(media.mediaId)}`);
   return decryptChatImage(await enc.arrayBuffer(), media.key, media.iv, media.mediaType);
+}
+
+// Small in-memory LRU over decrypted chat-image blobs. The wire + at-rest
+// policy for this ciphertext is no-store on purpose, which used to mean every
+// mount of a bubble AND its lightbox re-downloaded + re-decrypted the same
+// image. Memory only — nothing here touches disk — and wiped on sign-out.
+const chatImageBlobCache = new Map<string, Promise<Blob>>();
+const CHAT_IMAGE_BLOB_CACHE_MAX = 20;
+
+export function getChatImageBlobCached(payload: { workspaceId: string; media: ChatMedia }): Promise<Blob> {
+  const cacheKey = `${payload.workspaceId}:${payload.media.mediaId}`;
+  const hit = chatImageBlobCache.get(cacheKey);
+  if (hit) {
+    // Refresh recency (Map preserves insertion order — delete + set = LRU touch).
+    chatImageBlobCache.delete(cacheKey);
+    chatImageBlobCache.set(cacheKey, hit);
+    return hit;
+  }
+  const pending = getChatImageBlob(payload);
+  chatImageBlobCache.set(cacheKey, pending);
+  // A failed fetch/decrypt must not poison the cache.
+  pending.catch(() => { chatImageBlobCache.delete(cacheKey); });
+  while (chatImageBlobCache.size > CHAT_IMAGE_BLOB_CACHE_MAX) {
+    const oldest = chatImageBlobCache.keys().next().value;
+    if (oldest === undefined) break;
+    chatImageBlobCache.delete(oldest);
+  }
+  return pending;
+}
+
+export function clearChatImageBlobCache(): void {
+  chatImageBlobCache.clear();
 }
 
 export async function editChatMessage(payload: {

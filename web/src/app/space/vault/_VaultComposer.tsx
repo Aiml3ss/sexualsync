@@ -31,6 +31,7 @@ import {
   vaultMediaTypeForFile,
   vaultUploadErrorMessage,
 } from "./_vault-helpers";
+import { stripVideoLocationMetadata } from "@/lib/video-location-strip";
 
 const MAX_VAULT_ORIGINAL_VIDEO_BYTES = 100 * 1024 * 1024 - 1024;
 
@@ -96,6 +97,18 @@ export function VaultComposer({
     setProgressPct(5);
     setStatus("Encrypting on this device.");
     try {
+      // Blank GPS location atoms (©xyz / com.apple.quicktime.location.*)
+      // inside MP4/MOV containers BEFORE encryption — iPhone clips otherwise
+      // carry the recording coordinates into the partner's decrypted copy.
+      // Same-size in-place patch; any parse anomaly falls back to the
+      // original bytes so an unusual file can never be corrupted.
+      // Skip only the Matroska family (different container, geotags absent);
+      // every ISO-BMFF MIME variant (mp4/quicktime/x-m4v/...) goes through,
+      // and the stripper returns the original for anything it can't parse.
+      let uploadSource: Blob = file;
+      if (mediaType !== "video/webm" && mediaType !== "video/x-matroska") {
+        uploadSource = (await stripVideoLocationMetadata(file)).blob;
+      }
       const salt = randomBase64(16);
       const itemId = crypto.randomUUID();
       // Derive once, then drop the passphrase string from local state so the
@@ -104,7 +117,7 @@ export function VaultComposer({
       setPassphrase("");
       setProgressPct(25);
       const encryptedVideo = await encryptVaultBlobWithKey(
-        file,
+        uploadSource,
         composerKey,
         salt,
         VAULT_KDF_ITERATIONS,

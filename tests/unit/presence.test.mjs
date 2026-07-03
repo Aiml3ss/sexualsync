@@ -18,6 +18,10 @@ const WS = {
   ],
 };
 
+function decodeB64(value) {
+  return Buffer.from(value, "base64").toString("utf8");
+}
+
 test("foreground-gate: stamp:false reads without marking the caller active", async () => {
   const env = makeStateEnv();
   await readPresenceResponse(env, WS, "me@test", { stamp: false });
@@ -31,4 +35,43 @@ test("foreground-gate: default (stamp:true) marks the caller active", async () =
   await readPresenceResponse(env, WS, "me@test");
   const partnerView = await readPresenceResponse(env, WS, "partner@test", { stamp: false });
   assert.ok(partnerView.partner.lastSeen, "a foreground refetch stamps the caller active");
+});
+
+test("state-backed presence reads pre-public store aliases before stamping", async () => {
+  const env = makeStateEnv();
+  const oldPresenceStore = decodeB64("YW5zLWtlbW15LXByZXNlbmNl");
+  const partnerSeen = "2026-06-01T12:00:00.000Z";
+  env.__kv.map.set(`${oldPresenceStore}:presence:${WS.id}`, JSON.stringify({
+    byEmail: { "partner@test": partnerSeen },
+    opens: { "partner@test": { "2026-06-01": true } }
+  }));
+
+  const myView = await readPresenceResponse(env, WS, "me@test");
+
+  assert.equal(myView.partner.lastSeen, partnerSeen);
+  const migrated = JSON.parse(env.__kv.map.get(`sexualsync-presence:presence:${WS.id}`));
+  assert.equal(migrated.byEmail["partner@test"], partnerSeen);
+  assert.ok(migrated.byEmail["me@test"], "foreground stamp should migrate my seen time to the neutral store");
+});
+
+test("presence heals partial neutral records from pre-public aliases", async () => {
+  const env = makeStateEnv();
+  const oldPresenceStore = decodeB64("YW5zLWtlbW15LXByZXNlbmNl");
+  const mySeen = "2026-06-02T12:00:00.000Z";
+  const partnerSeen = "2026-06-01T12:00:00.000Z";
+  env.__kv.map.set(`sexualsync-presence:presence:${WS.id}`, JSON.stringify({
+    byEmail: { "me@test": mySeen },
+    opens: { "me@test": { "2026-06-02": true } }
+  }));
+  env.__kv.map.set(`${oldPresenceStore}:presence:${WS.id}`, JSON.stringify({
+    byEmail: { "partner@test": partnerSeen },
+    opens: { "partner@test": { "2026-06-01": true } }
+  }));
+
+  const myView = await readPresenceResponse(env, WS, "me@test");
+
+  assert.equal(myView.partner.lastSeen, partnerSeen);
+  const healed = JSON.parse(env.__kv.map.get(`sexualsync-presence:presence:${WS.id}`));
+  assert.ok(healed.byEmail["me@test"]);
+  assert.equal(healed.byEmail["partner@test"], partnerSeen);
 });

@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getChatImageBlob } from "@/lib/api";
+import { getChatImageBlobCached } from "@/lib/api";
 import type { ChatMedia } from "@/lib/types";
 
 const MAX_SCALE = 5;
@@ -50,11 +50,14 @@ export default function ImageLightbox({
   });
   const lastTap = useRef(0);
 
-  // Decrypt an independent copy so we don't depend on the bubble's object URL.
+  // Reads through the decrypted-blob LRU: when the bubble already fetched this
+  // image, opening the lightbox costs one createObjectURL instead of a second
+  // download + decrypt. Still an independent object URL, so the bubble
+  // revoking its own URL can't break the zoomed view.
   useEffect(() => {
     let cancelled = false;
     let objectUrl = "";
-    getChatImageBlob({ workspaceId, media })
+    getChatImageBlobCached({ workspaceId, media })
       .then((blob) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);

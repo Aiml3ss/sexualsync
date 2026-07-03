@@ -69,13 +69,21 @@ const STATUS_ALIASES = {
   Completed: "completed",
   Archived: "archived"
 };
-const ALL_STATUSES = new Set(["draft", "pending", "sent", "reviewed", "on_deck", "completed", "archived", "expired"]);
-const REPLYABLE_STATUSES = new Set(["pending", "sent"]);
+const ALL_STATUSES = new Set(["draft", "pending", "sent", "maybe", "reviewed", "on_deck", "completed", "archived", "expired"]);
+// A `maybe` is deliberately REPLYABLE: the reviewer deferred ("I'll know closer
+// to the time"), so the reply action must still let her convert it to a real
+// Yes/Counter/Pass later ("Decide now"). It's the only non-pending/sent status
+// that can be replied to.
+const REPLYABLE_STATUSES = new Set(["pending", "sent", "maybe"]);
 
 const STATUS_TRANSITIONS = {
   draft: new Set(["sent", "archived"]),
-  pending: new Set(["sent", "reviewed", "on_deck", "completed", "archived", "expired"]),
-  sent: new Set(["reviewed", "on_deck", "completed", "archived", "expired"]),
+  pending: new Set(["sent", "maybe", "reviewed", "on_deck", "completed", "archived", "expired"]),
+  sent: new Set(["maybe", "reviewed", "on_deck", "completed", "archived", "expired"]),
+  // maybe → the reviewer decides (reviewed/on_deck), it lapses (expired), or
+  // either partner shelves it (archived). Back to sent is allowed so a re-send
+  // path stays open.
+  maybe: new Set(["sent", "reviewed", "on_deck", "completed", "archived", "expired"]),
   reviewed: new Set(["on_deck", "completed", "archived", "expired"]),
   on_deck: new Set(["completed", "archived", "reviewed"]),
   completed: new Set(["archived", "on_deck"]),
@@ -389,7 +397,11 @@ function unansweredAnchorMs(request) {
 }
 
 function isStaleUnansweredRequest(request, nowIso = new Date().toISOString()) {
-  if (!["pending", "sent"].includes(request.status)) return false;
+  // `maybe` is treated like an unanswered Ask for expiry: the reviewer deferred
+  // but never gave a final answer, so once the timing window passes it lapses
+  // the same way a never-opened Ask does (hasReviewerResponse stays false for a
+  // maybe — it stamps maybeAt, not reviewedAt/decisions).
+  if (!["pending", "sent", "maybe"].includes(request.status)) return false;
   if (hasReviewerResponse(request)) return false;
   const staleAt = unansweredStaleAtForRequest(request);
   if (!staleAt) return false;
@@ -1299,6 +1311,80 @@ export async function onRequest(context) {
       broadcastRoomEvent(context, workspace.id, {
         resource: "request-board",
         action: "reviewed",
+        entityId: existing.id,
+        actorEmail,
+        actorName,
+      });
+
+      return jsonResponse(200, {
+        request: updated,
+        emailResult,
+        workspaceId: workspace.id,
+        ...partitionForWorkspace(next, dataWorkspaceIds)
+      });
+    }
+
+    if (action === "maybe") {
+      // Reviewer defers: "I don't know how I'll feel yet." Unlike `reply`, this
+      // is NOT a final answer — the Ask stays REPLYABLE so she can convert it to
+      // a real Yes/Counter/Pass later ("Decide now"). We stamp maybeAt (never
+      // reviewedAt/decisions), so hasReviewerResponse stays false and the Ask
+      // still lapses on its timing window if she never circles back.
+      if (normalizeEmail(existing.reviewerEmail) !== normalizeEmail(actorEmail)) {
+        return jsonResponse(403, { error: "Only the assigned reviewer can mark this Ask as a maybe." });
+      }
+      if (!["pending", "sent"].includes(existing.status)) {
+        return jsonResponse(409, { error: "This Ask is no longer waiting for a first answer." });
+      }
+      const now = new Date().toISOString();
+      const maybePatch = {
+        status: "maybe",
+        maybeAt: now,
+        maybeByEmail: actorEmail,
+        maybeByName: actorName,
+        updatedAt: now
+      };
+      let updated = null;
+      let raceConflict = null;
+      const writtenRows = await writeRequestsAtomic(env, existing.workspaceId, (fresh) => {
+        const cur = fresh.find((item) => item.id === existing.id);
+        if (!cur) { raceConflict = { status: 404, error: "This Ask is no longer available." }; return null; }
+        if (!["pending", "sent"].includes(cur.status)) { raceConflict = { status: 409, error: "This Ask is no longer waiting for a first answer." }; return null; }
+        updated = { ...cur, ...maybePatch };
+        return fresh.map((item) => item.id === cur.id ? updated : item);
+      }, { legacyPeople });
+      if (raceConflict) return jsonResponse(raceConflict.status, { error: raceConflict.error });
+      const next = recombineRequests(allRequests, existing.workspaceId, writtenRows);
+      // Deliberately DON'T revoke reply tokens — an emailed-link reply must
+      // still let her decide later. A maybe is not a terminal answer.
+
+      const requesterMember = resolveMember(workspace, existing.requesterEmail);
+      let emailResult = { ok: true, skipped: true, reason: "maybe-no-email" };
+      if (requesterMember?.email && requesterMember.status === "active") {
+        // Push only, generic lock-screen-safe body (same discretion as reply).
+        // No email fallback: a "still deciding" signal doesn't warrant an inbox
+        // hit, and the Sexboard surfaces it on next open regardless.
+        runAfterResponse(context, async () => {
+          await notifyWorkspaceEvent(context, workspace.id, actorEmail, {
+            title: "Sexualsync",
+            body: "Something new in your room.",
+            tag: "request-maybe",
+            url: "/",
+            onlyEmail: normalizeEmail(requesterMember.email)
+          }).catch(() => []);
+        });
+      }
+
+      await appendAudit(env, workspace.id, {
+        type: "request_maybe",
+        actorEmail,
+        actorName,
+        entityType: "request",
+        entityId: existing.id
+      });
+      broadcastRoomEvent(context, workspace.id, {
+        resource: "request-board",
+        action: "maybe",
         entityId: existing.id,
         actorEmail,
         actorName,

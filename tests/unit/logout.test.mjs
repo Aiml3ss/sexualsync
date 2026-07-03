@@ -29,10 +29,9 @@ test("GET logout clears cookies and redirects to the signed-out page", async () 
   assert.equal(response.headers.get("location"), "/signed-out");
   assert.equal(response.headers.get("cache-control"), "no-store");
   const cookies = setCookies(response);
-  // Self-host cookies are host-scoped; the clear is emitted without a Domain=
-  // attribute (no Domain= is ever set).
   assert(cookies.some((cookie) => /^sxs-session=;/.test(cookie) && !cookie.includes("Domain=")));
-  assert(cookies.every((cookie) => !(/^sxs-session=;/.test(cookie) && cookie.includes("Domain="))));
+  assert(cookies.some((cookie) => /^sxs-session=;/.test(cookie) && cookie.includes("Domain=sexualsync.io")));
+  assert(cookies.some((cookie) => /^sxs-session=;/.test(cookie) && cookie.includes("Domain=.sexualsync.io")));
   assert(cookies.some((cookie) => /^sxs-refresh=;/.test(cookie)));
   assert(cookies.some((cookie) => /^sxs-oauth=;/.test(cookie) && cookie.includes("Path=/api/auth/google")));
 });

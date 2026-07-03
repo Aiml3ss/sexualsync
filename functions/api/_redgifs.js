@@ -8,8 +8,10 @@
 //   await redgifsDirectUrl(env, gifId) → { hd, sd, poster } | null
 //
 // Auth flow (RedGifs v2 / api.redgifs.com):
-//   POST https://api.redgifs.com/v2/auth/temporary  → { token }
+//   GET  https://api.redgifs.com/v2/auth/temporary  → { token }
 //   GET  https://api.redgifs.com/v2/gifs/{id}       (Authorization: Bearer token)
+// Every request needs a non-empty User-Agent (see fetchWithRetry) — RedGifs
+// started 400/401-ing empty-UA calls, which is what silently emptied search.
 //
 // Token is cached in KV (shared across the workspace, not per-user) with
 // a 12-hour TTL even though RedGifs gives them ~24h, so we refresh
@@ -39,11 +41,11 @@ const EXCLUDE_SEXUALITY = new Set(["gay", "trans", "transgender", "transsexual",
 
 // RedGifs blocks Cloudflare's datacenter IPs from its API (auth + search). When
 // REDGIFS_PROXY is set, route api.redgifs.com calls through that operator-run
-// byte-proxy (e.g. Sipario `https://host/api/stream?url=`), which egresses from
-// an unblocked IP and forwards our request headers (incl. Authorization). Self-
-// host leaves it unset and calls RedGifs directly. Only api.redgifs.com calls
-// are proxied; the public watch-page fallback (www.redgifs.com) stays direct —
-// it already works from every IP.
+// byte-proxy (URL shape `https://host/path?url=<encoded target>`), which
+// egresses from an unblocked IP and forwards our request headers (incl.
+// Authorization). Self-host leaves it unset and calls RedGifs directly. Only
+// api.redgifs.com calls are proxied; the public watch-page fallback
+// (www.redgifs.com) stays direct — it already works from every IP.
 function rgApiUrl(env, apiUrl) {
   const proxy = String(env?.REDGIFS_PROXY || "").trim();
   return proxy ? `${proxy}${encodeURIComponent(apiUrl)}` : apiUrl;
@@ -102,11 +104,25 @@ function retryDelayMs(attempt, response) {
   return 250 * Math.pow(2, attempt) + Math.floor(Math.random() * 120);
 }
 
+// RedGifs now rejects an EMPTY User-Agent (auth mint → 400, search/gif → 401),
+// which is what broke GIF search: our calls set only `accept`, and an empty
+// User-Agent can reach RedGifs when the request runtime (or an operator proxy,
+// where one is configured) forwards a blank value — token mint then fails and
+// every search returns zero. A real UA passes; no header at all also passes.
+// Send an explicit browser UA on every api.redgifs.com call. All RedGifs
+// fetches in this file go through here, so this covers mint, search, gif
+// lookup, and the watch-page fallback in one place.
+const RG_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+
 async function fetchWithRetry(url, init = {}, { retries = 2 } = {}) {
+  const withUa = {
+    ...init,
+    headers: { "user-agent": RG_USER_AGENT, ...(init.headers || {}) },
+  };
   let lastResponse = null;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      const res = await fetch(url, init);
+      const res = await fetch(url, withUa);
       lastResponse = res;
       if (res.ok || !RETRY_STATUSES.has(res.status) || attempt === retries) {
         return res;

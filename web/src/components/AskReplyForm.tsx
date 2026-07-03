@@ -31,6 +31,7 @@ export default function AskReplyForm({
   error,
   onCreateAct,
   onSubmit,
+  onMaybe,
 }: {
   requestedActs: string[];
   requestedTiming: Timing;
@@ -39,10 +40,14 @@ export default function AskReplyForm({
   error?: string;
   onCreateAct: (label: string) => Promise<Act>;
   onSubmit: (decisions: ReplyDecisionPayload[], note: string) => Promise<void>;
+  // Present only when deferring is allowed (a first answer on a pending/sent
+  // Ask). Absent when converting an existing "maybe" — you can't re-defer.
+  onMaybe?: () => Promise<void>;
 }) {
   const requested = requestedActs.length ? requestedActs : ["This Ask"];
   const [yesToAll, setYesToAll] = useState(false);
   const [passAll, setPassAll] = useState(false);
+  const [maybe, setMaybe] = useState(false);
   const [selectedCounterActIds, setSelectedCounterActIds] = useState<string[]>([]);
   const [actsExpanded, setActsExpanded] = useState(false);
   const [actSearch, setActSearch] = useState("");
@@ -72,11 +77,12 @@ export default function AskReplyForm({
   }, [acts, actsExpanded, filteredActs, selectedCounterActIds]);
   const counterTimingOptions = TIMINGS.filter((option) => option.value !== requestedTiming);
   const hiddenActCount = Math.max(0, acts.length - visibleActs.length);
-  const canSubmit = !submitting && (yesToAll || passAll || selectedCounterActs.length > 0 || !!counterTiming);
+  const canSubmit = !submitting && (yesToAll || passAll || maybe || selectedCounterActs.length > 0 || !!counterTiming);
 
   function toggleCounterAct(id: string) {
     setYesToAll(false);
     setPassAll(false);
+    setMaybe(false);
     setSelectedCounterActIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
@@ -86,6 +92,7 @@ export default function AskReplyForm({
     const act = await onCreateAct(label);
     setYesToAll(false);
     setPassAll(false);
+    setMaybe(false);
     setSelectedCounterActIds((prev) => (
       prev.includes(act.id) ? prev : [...prev, act.id]
     ));
@@ -98,6 +105,17 @@ export default function AskReplyForm({
   async function submit(originEl?: HTMLElement) {
     if (!canSubmit) return;
     setLocalError(null);
+    // "Maybe" is a defer, not a decision — it takes the dedicated action and
+    // never builds a decisions array (that would read as a final answer).
+    if (maybe && onMaybe) {
+      try {
+        await onMaybe();
+        fireSendPulse(originEl);
+      } catch (err) {
+        setLocalError(err instanceof Error ? err.message : "Couldn't save your maybe.");
+      }
+      return;
+    }
     const requestedDecision = passAll ? "No" : "Yes";
     const shouldAnswerRequestedActs = passAll || yesToAll || (!!counterTiming && selectedCounterActs.length === 0);
     const decisions: ReplyDecisionPayload[] = shouldAnswerRequestedActs
@@ -168,11 +186,29 @@ export default function AskReplyForm({
             onClick={() => {
               setYesToAll(true);
               setPassAll(false);
+              setMaybe(false);
               setSelectedCounterActIds([]);
             }}
           >
             Yes to all
           </button>
+          {onMaybe && (
+            <button
+              type="button"
+              className={`cadence-chip pressable ${maybe ? "is-picked" : ""}`}
+              aria-pressed={maybe}
+              disabled={submitting}
+              onClick={() => {
+                setMaybe(true);
+                setYesToAll(false);
+                setPassAll(false);
+                setSelectedCounterActIds([]);
+                setCounterTiming("");
+              }}
+            >
+              Maybe
+            </button>
+          )}
           <button
             type="button"
             className={`cadence-chip pressable ${passAll ? "is-picked" : ""}`}
@@ -181,6 +217,7 @@ export default function AskReplyForm({
             onClick={() => {
               setPassAll(true);
               setYesToAll(false);
+              setMaybe(false);
               setSelectedCounterActIds([]);
               setCounterTiming("");
             }}
@@ -188,6 +225,11 @@ export default function AskReplyForm({
             Pass
           </button>
         </div>
+        {maybe && (
+          <p className="review-maybe-hint">
+            Marks this a maybe — it stays open and you can decide closer to the time.
+          </p>
+        )}
       </section>
 
       <section className="review-decision-card">
@@ -290,6 +332,7 @@ export default function AskReplyForm({
               disabled={submitting}
               onClick={() => {
                 setPassAll(false);
+                setMaybe(false);
                 setCounterTiming((value) => value === option.value ? "" : option.value);
               }}
             >
@@ -321,7 +364,7 @@ export default function AskReplyForm({
       )}
 
       <button type="submit" className="btn-primary w-full" disabled={!canSubmit} data-testid="ask-reply-submit">
-        {submitting ? "Sending..." : "Send reply"}
+        {submitting ? "Sending..." : maybe ? "Save maybe" : "Send reply"}
       </button>
     </form>
   );

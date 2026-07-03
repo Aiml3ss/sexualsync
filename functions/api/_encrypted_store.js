@@ -27,6 +27,11 @@ export const DATA_ENCRYPTED_STORES = [
   // at rest. Not yet a DB-primary store — chat stays on KV until the
   // database-backend migration (docs/self-host/GOING-PUBLIC.md) adopts it.
   "sexualsync-chat",
+  // Beta-interest emails captured by the public POST /api/beta-request. A list
+  // of real addresses interested in a sexual-intimacy product is itself
+  // sensitive and must not sit in plaintext at rest. Not a DB-primary store.
+  // (Existing plaintext rows are migrated by scripts/encrypt-app-data-at-rest.mjs.)
+  "sexualsync-beta",
   // RedGifs Bearer token cache (audit L1) — a credential, kept off plaintext KV.
   "sexualsync-redgifs-token",
   // RedGifs metadata/direct-url cache. No credential, but IDs and URLs can reveal

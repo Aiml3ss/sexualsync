@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   getAccessBlockReason,
   getPwaEnvironment,
@@ -17,6 +17,28 @@ import {
 // useLayoutEffect warns when the component is server-rendered; the gate is
 // prerendered by the static export, so alias to useEffect off-window.
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+const GITHUB_URL = "https://github.com/Aiml3ss/sexualsync";
+
+// A few real screens, shown inline so desktop visitors see the room before they
+// reach for their phone. Served from dist/ (copied with the presentation deck).
+const SHOTS: { src: string; alt: string }[] = [
+  { src: "/docs/screenshots/share/03-sexboard-home.png", alt: "The Sexboard — the room's home screen" },
+  { src: "/docs/screenshots/share/05-ask-detail.png", alt: "An Ask, with acts, timing, and the reply" },
+  { src: "/docs/screenshots/share/07-new-ask.png", alt: "Composing a new Ask" },
+  { src: "/docs/screenshots/share/08-inspiration.png", alt: "Inspiration — kinks and fantasies before plans" },
+  { src: "/docs/screenshots/share/13-pile-revealed.png", alt: "The Pile — only the overlap reveals" },
+];
+
+function GithubMark() {
+  return (
+    <svg className="mobile-access-gh-mark" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+      />
+    </svg>
+  );
+}
 
 type GateState =
   | { status: "checking" }
@@ -48,31 +70,19 @@ function copyTextFor(reason: AccessBlockReason) {
   return {
     eyebrow: "Mobile only",
     title: "Get Curious. Get in Sync.",
-    description: "A private room for couples to explore what they want, share ideas and kinks, and turn curiosity into clear asks together.",
-    body: "This app is designed for a private mobile browser or Home Screen install, not desktop browsing.",
+    description: "A private room for two — explore what you want, trade ideas and kinks, and turn a quiet curiosity into a clear ask. No feed, no profiles, no one else in the room.",
+    body: "The app is built for a private mobile browser or a Home Screen install, so this is as far as desktop goes.",
+    selfHost: "There is no public sign-up. The whole thing is open source — run your own copy and your data never leaves your server.",
   };
 }
 
 function MobileAccessPage({ reason }: { reason: AccessBlockReason }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const wavesRef = useRef<SVGSVGElement | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
-  const currentUrl = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    return window.location.href;
-  }, []);
   const copy = copyTextFor(reason);
-
-  async function copyLink() {
-    if (!currentUrl) return;
-    try {
-      await navigator.clipboard.writeText(currentUrl);
-      setCopyState("copied");
-      window.setTimeout(() => setCopyState("idle"), 2400);
-    } catch {
-      setCopyState("failed");
-    }
-  }
+  // Show the app showcase on the desktop "mobile-only" state, not on the
+  // in-app-browser / iOS-Safari install prompts (those are small + instructional).
+  const showcase = reason !== "embedded" && reason !== "ios-browser";
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -97,26 +107,34 @@ function MobileAccessPage({ reason }: { reason: AccessBlockReason }) {
       reducedMotion = reduceQuery.matches;
       if (reducedMotion) settle();
     };
-    const onMove = (event: PointerEvent) => {
-      if (reducedMotion) return;
-      const rect = stage.getBoundingClientRect();
-      tx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-      ty = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-    };
+    // Demand-driven rAF: runs only while the eased values are chasing the
+    // pointer, then idles (see RoomEncryptionGate for the same pattern). The
+    // old loop ran every frame for the entire life of the access screen.
     const tick = () => {
       if (!reducedMotion) {
         cx += (tx - cx) * 0.06;
         cy += (ty - cy) * 0.06;
         stage.style.setProperty("--tx", cx.toFixed(3));
         stage.style.setProperty("--ty", cy.toFixed(3));
+        if (Math.abs(tx - cx) + Math.abs(ty - cy) > 0.001) {
+          raf = requestAnimationFrame(tick);
+          return;
+        }
       }
-      raf = requestAnimationFrame(tick);
+      raf = 0;
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
+    const onMove = (event: PointerEvent) => {
+      if (reducedMotion) return;
+      const rect = stage.getBoundingClientRect();
+      tx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+      ty = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+      kick();
     };
 
     stage.addEventListener("pointermove", onMove);
     stage.addEventListener("pointerleave", settle);
     reduceQuery.addEventListener("change", onMotionChange);
-    raf = requestAnimationFrame(tick);
     return () => {
       stage.removeEventListener("pointermove", onMove);
       stage.removeEventListener("pointerleave", settle);
@@ -172,21 +190,40 @@ function MobileAccessPage({ reason }: { reason: AccessBlockReason }) {
             </svg>
           </div>
         </div>
-        <p className="mobile-access-eyebrow">{copy.eyebrow}</p>
-        <h1 id="mobile-access-title">{copy.title}</h1>
-        {"description" in copy && copy.description && (
-          <p className="mobile-access-description">{copy.description}</p>
-        )}
-        <p className="mobile-access-body">{copy.body}</p>
+        <div className="mobile-access-lead">
+          <p className="mobile-access-eyebrow">{copy.eyebrow}</p>
+          <h1 id="mobile-access-title">{copy.title}</h1>
+          {"description" in copy && copy.description && (
+            <p className="mobile-access-description">{copy.description}</p>
+          )}
+          <p className="mobile-access-body">{copy.body}</p>
+          {"selfHost" in copy && copy.selfHost && (
+            <p className="mobile-access-selfhost">{copy.selfHost}</p>
+          )}
 
-        <div className="mobile-access-actions">
-          <a className="mobile-access-primary pressable" href="/presentation.html">
-            View presentation
-          </a>
-          <button type="button" className="mobile-access-copy pressable" onClick={copyLink}>
-            {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy unavailable" : "Copy app link"}
-          </button>
+          <div className="mobile-access-actions">
+            <a className="mobile-access-primary pressable" href="/presentation.html">
+              View presentation
+            </a>
+            <a className="mobile-access-github pressable" href={GITHUB_URL} target="_blank" rel="noreferrer">
+              <GithubMark />
+              <span>Self-host it on GitHub</span>
+            </a>
+          </div>
         </div>
+
+        {showcase && (
+          <div className="mobile-access-shots" aria-label="A look inside the app">
+            <div className="mobile-access-shots-track">
+              {SHOTS.map((shot) => (
+                <figure className="mobile-access-shot" key={shot.src}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={shot.src} alt={shot.alt} loading="lazy" decoding="async" />
+                </figure>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );

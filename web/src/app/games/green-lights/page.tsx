@@ -290,7 +290,8 @@ function Runner({ workspace, onSubmitted }: { workspace: Workspace; onSubmitted:
         <button type="button" onClick={back} aria-label="Previous" disabled={index === 0}
           style={{ background: "none", border: "none", color: "rgb(var(--cream-rgb) / 0.6)", fontSize: 20, cursor: index === 0 ? "default" : "pointer", opacity: index === 0 ? 0.3 : 1, padding: 0 }}>‹</button>
         <div style={{ flex: 1, height: 5, borderRadius: 999, background: "rgb(var(--cream-rgb) / 0.1)", overflow: "hidden" }}>
-          <div style={{ width: `${pct}%`, height: "100%", background: "linear-gradient(90deg, var(--accent), var(--accent-deep))", borderRadius: 999, transition: "width 240ms ease" }} />
+          {/* scaleX, not width — a width transition re-runs layout every frame. */}
+          <div style={{ width: "100%", height: "100%", background: "linear-gradient(90deg, var(--accent), var(--accent-deep))", borderRadius: 999, transform: `scaleX(${pct / 100})`, transformOrigin: "left", transition: "transform 240ms ease" }} />
         </div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "rgb(var(--cream-rgb) / 0.5)" }}>{index + 1} / {deck.length}</div>
         <button type="button" onClick={next} aria-label="Next" disabled={nextDisabled}

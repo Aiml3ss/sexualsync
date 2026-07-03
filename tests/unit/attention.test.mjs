@@ -70,6 +70,15 @@ test("attentionCountFor is 0 for a blank/unknown recipient", async () => {
   assert.equal(await attentionCountFor(env, WS, ""), 0);
 });
 
+test("attentionCountFor counts a maybe I deferred — I still owe a final decision", async () => {
+  const env = await setup();
+  await seedRequests(env, [
+    req("r1", { status: "maybe", maybeByEmail: ME }),                          // I deferred, still owe → counts
+    req("r2", { status: "maybe", reviewerEmail: PARTNER, requesterEmail: ME }), // partner owes on my ask → no
+  ]);
+  assert.equal(await attentionCountFor(env, WS, ME), 1, "a maybe I owe counts as needs-you");
+});
+
 // Regression: the push badge previously counted only asks + kinks, so an active
 // Pile / Blind Reveal needing the recipient showed as a lower number on the
 // home-screen icon than the app's "Needs you" list. The badge must include them.

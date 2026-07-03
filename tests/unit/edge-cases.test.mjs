@@ -27,7 +27,7 @@ function seedLegacyCouple(env) {
   seedJson(env, "sex-exploration-platform:profiles", []);
   seedJson(env, "sex-exploration-platform:workspaces", [{
     id: "legacy-couple",
-    name: "Sexualsync",
+    name: "sexualsync.io",
     displayName: "Legacy room",
     createdByEmail: LEGACY_OWNER_EMAIL,
     createdAt: NOW,

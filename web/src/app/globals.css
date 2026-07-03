@@ -380,9 +380,13 @@ h1, h2, h3, .font-display {
   animation: route-enter var(--dur-route, 520ms) var(--ease-settle, ease) both;
 }
 
+/* Opacity + transform only — both compositor-cheap. The old blur(10px→0)
+   re-ran a large-kernel blur shader over the whole main-content layer for
+   every frame of every navigation: the classic janky-transition source on
+   older iPhones. */
 @keyframes route-enter {
-  from { opacity: 0; filter: blur(10px); transform: translateY(4px); }
-  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1546,8 +1550,8 @@ h1, h2, h3, .font-display {
     radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 46%),
     linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 68%);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent),
-    0 14px 32px color-mix(in srgb, var(--accent) 10%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
+    0 15px 34px color-mix(in srgb, var(--accent) 12%, transparent);
   opacity: 0.82;
   pointer-events: none;
   animation: sexboard-attention-field 2.8s ease-in-out infinite;
@@ -1820,19 +1824,12 @@ h1, h2, h3, .font-display {
   gap: 12px;
 }
 
+/* Opacity-only: the ::before layer carries a static mid-strength glow and the
+   whole layer breathes. Animating the multi-layer box-shadow repainted the
+   card-sized field every frame of the Sexboard's most common state. */
 @keyframes sexboard-attention-field {
-  0%, 100% {
-    opacity: 0.66;
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--accent) 6%, transparent),
-      0 12px 28px color-mix(in srgb, var(--accent) 8%, transparent);
-  }
-  50% {
-    opacity: 1;
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
-      0 18px 40px color-mix(in srgb, var(--accent) 15%, transparent);
-  }
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 @keyframes sexboard-attention-dot {
@@ -4213,9 +4210,19 @@ h1, h2, h3, .font-display {
   display: none;
 }
 
+.kink-library-more {
+  display: flex;
+  justify-content: center;
+  padding: 2px 12px 14px;
+}
+
 .kink-card {
   position: relative;
   overflow: hidden;
+  /* Long library lists: skip render work for cards far off-screen; engines
+     without content-visibility ignore both lines. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
   padding: 14px 16px 12px;
   border: 1px solid var(--hairline);
   border-radius: var(--r-md);
@@ -5325,13 +5332,28 @@ h1, h2, h3, .font-display {
 }
 
 .game-status.status-active {
-  border: 1px solid var(--accent-fog);
+  position: relative;
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
   background:
     linear-gradient(90deg, var(--accent-mist), rgba(var(--accent-rgb), 0.2), var(--accent-mist));
   background-size: 220% 100%;
   color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.04), 0 0 20px rgba(var(--accent-rgb), 0.16);
-  animation: game-status-pulse 1.8s ease-in-out infinite, game-status-sheen 2.6s ease-in-out infinite;
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.08), 0 0 20px rgba(var(--accent-rgb), 0.18);
+}
+/* The live pulse is an opacity breathe on a glow overlay — compositor-only.
+   The old version animated border-color + box-shadow (game-status-pulse) and
+   background-position (game-status-sheen), repainting the pill continuously
+   for as long as a game was active. */
+.game-status.status-active::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid rgba(var(--accent-rgb), 0.7);
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.13), 0 0 26px rgba(var(--accent-rgb), 0.28);
+  opacity: 0;
+  pointer-events: none;
+  animation: game-status-pulse 1.8s ease-in-out infinite;
 }
 
 .game-status.status-active::before {
@@ -5352,19 +5374,8 @@ h1, h2, h3, .font-display {
 }
 
 @keyframes game-status-pulse {
-  0%, 100% {
-    border-color: rgba(var(--accent-rgb), 0.28);
-    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.04), 0 0 16px rgba(var(--accent-rgb), 0.12);
-  }
-  50% {
-    border-color: rgba(var(--accent-rgb), 0.7);
-    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.13), 0 0 26px rgba(var(--accent-rgb), 0.28);
-  }
-}
-
-@keyframes game-status-sheen {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
 @keyframes game-status-dot {
@@ -9186,13 +9197,22 @@ h1, h2, h3, .font-display {
 
 .review-choice-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* auto-fit so the grid holds 2 chips (Yes / Pass) or 3 (Yes / Maybe / Pass)
+     without a fixed column count fighting the optional Maybe. */
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
   gap: 9px;
   margin-top: 10px;
 }
 
 .review-choice-grid .cadence-chip {
   min-height: 48px;
+}
+
+.review-maybe-hint {
+  margin-top: 9px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgb(var(--cream-rgb) / 0.62);
 }
 
 .review-cadence-grid {
@@ -10603,23 +10623,12 @@ h1, h2, h3, .font-display {
 .sexboard-waiting-spark.b { animation: sexboard-room-spark 4.1s ease-in-out 2.7s infinite; }
 .sexboard-waiting-spark.c { animation: sexboard-room-spark 3.8s ease-in-out 3.1s infinite; }
 
+/* Transform-only float; the shadow set stays static on the element (the
+   animated multi-layer box-shadow made the orb repaint every frame for the
+   whole waiting state). */
 @keyframes sexboard-room-orb-float {
-  0%, 100% {
-    transform: translateY(0) scale(0.992);
-    box-shadow:
-      0 18px 42px rgba(0, 0, 0, 0.28),
-      0 0 34px color-mix(in srgb, var(--accent) 13%, transparent),
-      inset 0 1px 0 color-mix(in srgb, var(--cream) 16%, transparent),
-      inset 0 -18px 34px color-mix(in srgb, var(--bg) 34%, transparent);
-  }
-  50% {
-    transform: translateY(-3px) scale(1.018);
-    box-shadow:
-      0 23px 52px rgba(0, 0, 0, 0.32),
-      0 0 54px color-mix(in srgb, var(--accent) 23%, transparent),
-      inset 0 1px 0 color-mix(in srgb, var(--cream) 22%, transparent),
-      inset 0 -18px 34px color-mix(in srgb, var(--bg) 28%, transparent);
-  }
+  0%, 100% { transform: translateY(0) scale(0.992); }
+  50% { transform: translateY(-3px) scale(1.018); }
 }
 
 @keyframes sexboard-room-ring {
@@ -11463,7 +11472,25 @@ h1, h2, h3, .font-display {
     inset 0 -11px 18px rgba(150,58,86,0.2),
     0 2px 6px rgba(0,0,0,0.34),
     0 12px 30px rgba(233,168,179,0.34);
+  position: relative;
+}
+/* Breathe = opacity pulse of a glow overlay (compositor-only). The old
+   keyframes animated box-shadow + filter:brightness, repainting the CTA for
+   the whole life of the sign-in screen. */
+.signin-cl .pa-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 16px 46px rgba(233,168,179,0.5);
+  opacity: 0;
+  pointer-events: none;
   animation: cl-cta-breathe 5.6s ease-in-out 2.6s infinite;
+}
+.signin-cl.public-preview .public-preview-primary::after,
+.signin-cl .pa-cta.is-disabled::after {
+  animation: none;
+  opacity: 0;
 }
 .signin-cl.public-preview .public-preview-primary {
   animation: none;
@@ -11477,22 +11504,8 @@ h1, h2, h3, .font-display {
   animation: none;
 }
 @keyframes cl-cta-breathe {
-  0%, 100% {
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.5),
-      inset 0 -11px 18px rgba(150,58,86,0.2),
-      0 2px 6px rgba(0,0,0,0.34),
-      0 10px 26px rgba(233,168,179,0.26);
-    filter: brightness(0.985);
-  }
-  50% {
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.56),
-      inset 0 -11px 18px rgba(150,58,86,0.18),
-      0 2px 6px rgba(0,0,0,0.34),
-      0 16px 46px rgba(233,168,179,0.5);
-    filter: brightness(1.035);
-  }
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 .signin-cl .pa-cta:hover {
   filter: brightness(1.04);
@@ -11799,27 +11812,34 @@ button.card:active,
     color var(--dur-state, 320ms) var(--ease-settle, ease),
     font-weight var(--dur-state, 320ms) var(--ease-settle, ease);
 }
-/* Unread badge: ring it off the bar + a slow living glow. */
+/* Unread badge: ring it off the bar + a slow living glow. The dot is on
+   screen on EVERY page while an unread exists, so the breathe must be
+   compositor-only: rings + minimum glow are static on the element, and the
+   extra glow lives on a pseudo whose OPACITY pulses. Animating box-shadow
+   here kept the whole app repainting at idle.
+   NO position here: the base rule (~line 3047) places the badge with
+   position:absolute over the tab icon — a later `position: relative` knocked
+   it out of that slot (v1.2.146 regression). The ::after's inset works off
+   that same absolute positioning. */
 .tab-unread-dot {
   box-shadow:
     inset 0 0 0 1px rgba(var(--ink-rgb), 0.62),
     0 0 0 2px rgba(12, 5, 8, 0.92),
-    0 2px 10px rgba(233, 168, 179, 0.45);
+    0 2px 9px rgba(233, 168, 179, 0.38);
+}
+.tab-unread-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  box-shadow: 0 3px 16px rgba(233, 168, 179, 0.70);
+  opacity: 0;
+  pointer-events: none;
   animation: tab-unread-breathe 2.6s var(--ease-settle, ease-in-out) infinite;
 }
 @keyframes tab-unread-breathe {
-  0%, 100% {
-    box-shadow:
-      inset 0 0 0 1px rgba(var(--ink-rgb), 0.62),
-      0 0 0 2px rgba(12, 5, 8, 0.92),
-      0 2px 9px rgba(233, 168, 179, 0.38);
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 1px rgba(var(--ink-rgb), 0.62),
-      0 0 0 2px rgba(12, 5, 8, 0.92),
-      0 3px 16px rgba(233, 168, 179, 0.70);
-  }
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
 /* ── Empty / error / state cards — let them arrive instead of snapping in.
@@ -11837,7 +11857,8 @@ button.card:active,
    Focus rings, selection, scrollbar and hover finishes are static already and
    stay; only the breathe + entrance animations are silenced. ──────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .tab-unread-dot {
+  .tab-unread-dot,
+  .tab-unread-dot::after {
     animation: none !important;
   }
   .tab::before,
@@ -12186,7 +12207,36 @@ button.card:active,
   line-height: 1.55;
 }
 
-.chat-day-group { display: flex; flex-direction: column; gap: 2px; }
+.chat-day-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Skip rendering work for day groups far outside the viewport (long
+     threads). `auto` intrinsic-size remembers the real height once rendered,
+     so scroll geometry stays stable; engines without content-visibility
+     simply ignore both lines. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 480px;
+}
+
+/* "Show earlier messages" — DOM-last inside the column-reverse thread, so it
+   renders at the visual top where history continues. */
+.chat-load-earlier-row {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0 6px;
+}
+.chat-load-earlier {
+  border: 1px solid rgb(var(--cream-rgb) / 0.16);
+  background: rgb(var(--cream-rgb) / 0.05);
+  color: rgb(var(--cream-rgb) / 0.72);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
 
 .chat-day-divider {
   display: flex;
@@ -12564,9 +12614,12 @@ button.card:active,
 }
 .sync-score-fill {
   width: var(--sync-target, 0%);
+  transform-origin: left;
   animation: sync-score-fill 1000ms var(--ease-settle, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
-@keyframes sync-score-fill { from { width: 0; } }
+/* scaleX, not width: the one-shot reveal used to run layout for every frame
+   of its 1s fill. */
+@keyframes sync-score-fill { from { transform: scaleX(0); } }
 
 @media (prefers-reduced-motion: reduce) {
   .sync-score-reveal,
@@ -12935,6 +12988,93 @@ button.card:active,
   border: 0;
   border-radius: 14px;
   background: rgb(var(--cream-rgb) / 0.06);
+}
+/* In-view wrapper for the bubble GIF (the IntersectionObserver target that
+   attaches/detaches the stream). Present in ALL resolve states so the
+   observer can bind on mount; sizing lives on the child. No pointer-events
+   here — the iframe fallback must stay interactive; the <video> child keeps
+   its own pointer-events:none so long-presses still reach the bubble. */
+.chat-gif-inview {
+  display: block;
+  position: relative;
+}
+
+/* Reveal-gated thread GIF (mirrors Off the Shelf). Opens hidden behind a soft
+   gradient; a Reveal tap plays it, Hide re-hides. */
+.chat-gif-hidden {
+  position: relative;
+  display: block;
+  width: min(72vw, 300px);
+  aspect-ratio: 1 / 1;
+  border: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgb(var(--cream-rgb) / 0.06);
+  cursor: pointer;
+  pointer-events: auto; /* the hidden tile is the tap target that reveals */
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-gif-art {
+  position: absolute;
+  inset: 0;
+}
+.chat-gif-art .art-base {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(140deg, rgb(var(--accent-rgb) / 0.22), rgb(23, 10, 16, 0.55));
+}
+.chat-gif-art .art-bloom-a {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 30% 28%, rgb(var(--accent-rgb) / 0.30), transparent 55%);
+}
+.chat-gif-art .art-bloom-b {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 72% 76%, rgb(var(--cream-rgb) / 0.14), transparent 55%);
+}
+.chat-gif-art .art-vignette {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 44px 8px rgb(12, 5, 8, 0.55);
+}
+.chat-gif-reveal-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgb(12, 5, 8, 0.62);
+  box-shadow: inset 0 0 0 1px rgb(var(--cream-rgb) / 0.22);
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* Hide button — small pill over the playing GIF. Interactive over the
+   pointer-events:none video. */
+.chat-gif-hide {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  pointer-events: auto;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(12, 5, 8, 0.6);
+  box-shadow: inset 0 0 0 1px rgb(var(--cream-rgb) / 0.2);
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 /* RedGifs now plays in our own muted <video>. pointer-events off so a
    long-press still reaches the bubble (react / reply). */

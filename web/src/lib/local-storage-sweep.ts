@@ -10,10 +10,23 @@
  * additionally cleared here via the optional hook the caller passes in.
  */
 
+// Pre-`ss:` private-note keys (see private-notes.ts). They hold intimate
+// plaintext on installs that predate encryption-at-rest, so sign-out must
+// remove them like everything else. Deliberately NOT the broader
+// `sexualsync-*` family: the push keys (sexualsync-push-*) survive sign-out
+// on purpose — deleting the re-save dedupe would re-burn the push rate limit
+// on every login.
+const LEGACY_SWEEP_PREFIXES = ["sexualsync.privateNotes", "sexualsync-private-sparks:"];
+
 export function clearAllNamespacedLocalState(): void {
   if (typeof window === "undefined") return;
   sweep("localStorage");
   sweep("sessionStorage");
+}
+
+function shouldSweep(key: string): boolean {
+  if (key.startsWith("ss:")) return true;
+  return LEGACY_SWEEP_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 function sweep(area: "localStorage" | "sessionStorage"): void {
@@ -23,7 +36,7 @@ function sweep(area: "localStorage" | "sessionStorage"): void {
     const keysToRemove: string[] = [];
     for (let i = 0; i < storage.length; i += 1) {
       const key = storage.key(i);
-      if (key && key.startsWith("ss:")) keysToRemove.push(key);
+      if (key && shouldSweep(key)) keysToRemove.push(key);
     }
     keysToRemove.forEach((key) => {
       try { storage.removeItem(key); } catch { /* ignore */ }

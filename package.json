@@ -1,6 +1,6 @@
 {
   "name": "sexualsync",
-  "version": "1.2.140",
+  "version": "1.2.157",
   "private": true,
   "type": "module",
   "engines": {
@@ -22,5 +22,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0"
-  }
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
 }

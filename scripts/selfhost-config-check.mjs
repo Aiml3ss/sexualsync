@@ -78,6 +78,12 @@ if (exists(".env.selfhost.example")) {
   });
 }
 
+// The Cloudflare-focused env example should point at the self-host template
+// without being rewritten around it.
+if (exists(".env.example")) {
+  assert(read(".env.example").includes(".env.selfhost.example"), ".env.example should point readers at .env.selfhost.example.");
+}
+
 // --- Runtime marker: default must be cloudflare -----------------------------
 
 assert(exists("functions/api/_runtime.js"), "functions/api/_runtime.js runtime marker must exist.");
@@ -153,13 +159,16 @@ if (exists("selfhost/server.mjs")) {
   assert(server.includes("local email/password sign-in is enabled"), "Self-host server must report zero-config local password sign-in when external auth is absent.");
 }
 
-// --- Self-host scripts present ---------------------------------------------
+// --- Cloudflare deploy chain must stay free of self-host -------------------
 
 if (exists("package.json")) {
   const pkg = JSON.parse(read("package.json"));
   ["selfhost:check", "selfhost:build", "selfhost:serve", "selfhost:smoke", "selfhost:test"].forEach((s) => {
     assert(pkg.scripts && pkg.scripts[s], `package.json missing script: ${s}`);
   });
+  const deploy = pkg.scripts?.deploy || "";
+  assert(deploy.includes("wrangler pages deploy"), "deploy script must remain the Cloudflare Pages deploy.");
+  assert(!/selfhost/i.test(deploy), "Cloudflare deploy chain must NOT reference self-host scripts.");
 }
 
 if (failures.length) {

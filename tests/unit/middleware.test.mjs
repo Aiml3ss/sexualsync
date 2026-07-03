@@ -16,7 +16,7 @@ function ctx(request, env = {}) {
   return { context, calledNext: () => nextCalled };
 }
 
-const apiPost = (origin) => new Request("https://example.com/api/invite", {
+const apiPost = (origin) => new Request("https://sexualsync.io/api/invite", {
   method: "POST",
   headers: origin === null ? {} : { origin },
 });
@@ -29,7 +29,7 @@ test("blocks a cross-origin API mutation", async () => {
 });
 
 test("allows a same-origin API mutation", async () => {
-  const { context, calledNext } = ctx(apiPost("https://example.com"));
+  const { context, calledNext } = ctx(apiPost("https://sexualsync.io"));
   const res = await onRequest(context);
   assert.equal(res.status, 200);
   assert.equal(calledNext(), true);
@@ -42,7 +42,7 @@ test("allows an API mutation with no Origin header (Bearer / cron clients)", asy
 });
 
 test("does not touch safe methods even cross-origin", async () => {
-  const req = new Request("https://example.com/api/profile", {
+  const req = new Request("https://sexualsync.io/api/profile", {
     method: "GET",
     headers: { origin: "https://evil.example" },
   });
@@ -52,13 +52,13 @@ test("does not touch safe methods even cross-origin", async () => {
 });
 
 test("still 404s retired paths", async () => {
-  const { context } = ctx(new Request("https://example.com/legacy.html"));
+  const { context } = ctx(new Request("https://sexualsync.io/legacy.html"));
   const res = await onRequest(context);
   assert.equal(res.status, 404);
 });
 
 test("adds a CSP nonce to HTML navigations", async () => {
-  const request = new Request("https://example.com/");
+  const request = new Request("https://sexualsync.io/");
   const context = {
     request,
     next: async () => new Response("<html><head><link rel=\"preload\" as=\"script\" href=\"/_next/static/chunks/app.js\"><style>.x{color:red}</style></head><body><script>window.x=1</script></body></html>", {
@@ -79,7 +79,7 @@ test("adds a CSP nonce to HTML navigations", async () => {
 });
 
 test("redirects protected app pages before unauthenticated shell load", async () => {
-  const { context, calledNext } = ctx(new Request("https://example.com/sexboard"));
+  const { context, calledNext } = ctx(new Request("https://sexualsync.io/sexboard"));
   const res = await onRequest(context);
   assert.equal(res.status, 302);
   assert.equal(calledNext(), false);
@@ -103,7 +103,7 @@ test("allows protected app pages for private-preview owner-room sessions", async
     ],
   }]));
   const token = await createAppSessionToken(env, { email: "partner@example.com", provider: "email" });
-  const { context, calledNext } = ctx(new Request("https://example.com/sexboard", {
+  const { context, calledNext } = ctx(new Request("https://sexualsync.io/sexboard", {
     headers: { cookie: `sxs-session=${encodeURIComponent(token)}` },
   }), env);
   const res = await onRequest(context);
@@ -119,7 +119,7 @@ test("clears stale protected app sessions outside private preview", async () => 
     SEXUALSYNC_ADMIN_EMAIL: "owner@example.com",
   };
   const token = await createAppSessionToken(env, { email: "stranger@example.com", provider: "email" });
-  const { context, calledNext } = ctx(new Request("https://example.com/space/vault", {
+  const { context, calledNext } = ctx(new Request("https://sexualsync.io/space/vault", {
     headers: { cookie: `sxs-session=${encodeURIComponent(token)}` },
   }), env);
   const res = await onRequest(context);

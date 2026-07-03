@@ -168,6 +168,7 @@ function QuizRunner({ workspace, onSubmitted }: { workspace: Workspace; onSubmit
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const dragRef = useRef({ x: 0, y: 0 });
+  const moveRaf = useRef(0);
   const flinging = useRef(false);
 
   const card = deck[index];
@@ -196,11 +197,24 @@ function QuizRunner({ workspace, onSubmitted }: { workspace: Workspace; onSubmit
     if (!dragStart.current) return;
     const next = { x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y };
     dragRef.current = next;
-    setDrag(next);
+    // Coalesce to one state commit per frame: pointermove fires at up to
+    // 120Hz on iOS, and each uncoalesced setDrag ran a full QuizRunner
+    // render (header, card, hint, buttons) before the style could land.
+    if (moveRaf.current) return;
+    moveRaf.current = requestAnimationFrame(() => {
+      moveRaf.current = 0;
+      setDrag(dragRef.current);
+    });
   }
   function onCardPointerEnd() {
     if (!dragStart.current) return;
     dragStart.current = null;
+    // A queued frame committing a stale mid-drag position after the snap-back
+    // reset would make the card jump — drop it.
+    if (moveRaf.current) {
+      cancelAnimationFrame(moveRaf.current);
+      moveRaf.current = 0;
+    }
     setDragging(false);
     const { x, y } = dragRef.current;
     if (x > 90) fling("into", { x: 480, y });
@@ -351,7 +365,8 @@ function QuizRunner({ workspace, onSubmitted }: { workspace: Workspace; onSubmit
         <button type="button" onClick={back} aria-label="Previous card" disabled={index === 0}
           style={{ background: "none", border: "none", color: "rgb(var(--cream-rgb) / 0.6)", fontSize: 20, cursor: index === 0 ? "default" : "pointer", opacity: index === 0 ? 0.3 : 1, padding: 0 }}>‹</button>
         <div style={{ flex: 1, height: 5, borderRadius: 999, background: "rgb(var(--cream-rgb) / 0.1)", overflow: "hidden" }}>
-          <div style={{ width: `${pct}%`, height: "100%", background: "linear-gradient(90deg, var(--accent), var(--accent-deep))", borderRadius: 999, transition: "width 240ms ease" }} />
+          {/* scaleX, not width — a width transition re-runs layout every frame. */}
+          <div style={{ width: "100%", height: "100%", background: "linear-gradient(90deg, var(--accent), var(--accent-deep))", borderRadius: 999, transform: `scaleX(${pct / 100})`, transformOrigin: "left", transition: "transform 240ms ease" }} />
         </div>
         <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "rgb(var(--cream-rgb) / 0.5)" }}>{index + 1} / {deck.length}</div>
         <button type="button" onClick={next} aria-label="Next card" disabled={nextDisabled}
@@ -364,7 +379,7 @@ function QuizRunner({ workspace, onSubmitted }: { workspace: Workspace; onSubmit
           onPointerMove={onCardPointerMove}
           onPointerUp={onCardPointerEnd}
           onPointerCancel={onCardPointerEnd}
-          style={{ position: "relative", width: "100%", background: "var(--surface-2)", borderRadius: 24, boxShadow: "var(--ring-hairline-strong)", padding: "28px 22px", textAlign: "center", touchAction: "none", userSelect: "none", cursor: dragging ? "grabbing" : "grab", transform: `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x * 0.04}deg)`, transition: dragging ? "none" : "transform 200ms var(--ease-settle, ease)" }}
+          style={{ position: "relative", width: "100%", background: "var(--surface-2)", borderRadius: 24, boxShadow: "var(--ring-hairline-strong)", padding: "28px 22px", textAlign: "center", touchAction: "none", userSelect: "none", cursor: dragging ? "grabbing" : "grab", transform: `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x * 0.04}deg)`, transition: dragging ? "none" : "transform 200ms var(--ease-settle, ease)", willChange: dragging ? "transform" : undefined }}
         >
           {swipeHint && (
             <div aria-hidden="true" style={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", opacity: swipeOpacity, padding: "5px 14px", borderRadius: 999, background: "var(--surface-3)", color: swipeHint.color, fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, boxShadow: "var(--ring-hairline-strong)", whiteSpace: "nowrap", pointerEvents: "none" }}>

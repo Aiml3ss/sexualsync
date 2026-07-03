@@ -8,7 +8,7 @@
  * Room-Encryption workspace (encrypt/decrypt happens in lib/api).
  */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import ImageLightbox from "./_ImageLightbox";
@@ -21,7 +21,7 @@ import {
   editChatMessage,
   generateIdempotencyKey,
   getChat,
-  getChatImageBlob,
+  getChatImageBlobCached,
   getConfig,
   markChatRead,
   predictChatMessageId,
@@ -36,6 +36,8 @@ import {
 } from "@/lib/api";
 import { getProfileCached } from "@/lib/profile-cache";
 import { getCachedResource, setCachedResource, useColdStart } from "@/lib/resource-cache";
+import { normalizeImageForUpload } from "@/lib/image-normalize";
+import { useInView } from "@/lib/use-in-view";
 import { LIVE_ROOM_EVENT, LIVE_ROOM_PRESENCE, useLiveRoomReload, type LiveRoomEventDetail, type LiveRoomPresenceDetail } from "@/lib/use-live-room";
 import { partnerOf } from "@/lib/workspace";
 import { redgifsIdFromUrl } from "@/lib/shelf-source";
@@ -79,6 +81,12 @@ function writePersistedDraft(workspaceId: string, value: string): void {
 }
 const TYPING_THROTTLE_MS = 3000;
 const TYPING_CLEAR_MS = 5000;
+// Render window: a years-long thread can hold up to the server's 2000-message
+// ring buffer; mounting all of it is 16k-30k DOM nodes. Render the recent
+// slice and reveal history on demand. State keeps the full list (read cursors,
+// reply lookups, and seq math all use it) — only the render is windowed.
+const CHAT_WINDOW_INITIAL = 150;
+const CHAT_WINDOW_STEP = 200;
 
 // One-line preview of a message for the reply banner + the quoted-reply chip.
 function messagePreview(m: ChatMessage): string {
@@ -239,6 +247,7 @@ function ChatRoom({
   const threadRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const gifGridRef = useRef<HTMLDivElement | null>(null);
   const lastTypingSentRef = useRef(0);
   const typingClearRef = useRef<number | null>(null);
 
@@ -266,12 +275,55 @@ function ChatRoom({
   const partnerReadSeq = Number(readCursors[partnerEmail]) || 0;
   const partnerReadAt = readAt[partnerEmail] || "";
 
+  // The server supports `after` (seq-filtered incremental fetch), but only new
+  // messages get fresh seqs — reactions/edits/unsends mutate a message IN
+  // PLACE with its seq unchanged, so an incremental fetch would miss them.
+  // Track what kind of chat events arrived since the last reload:
+  //  - "message" / "read"  → incremental is safe (read cursors ride along on
+  //    every response, even an empty one);
+  //  - anything else (reaction/update/delete) → full fetch required;
+  //  - NO tracked events (reconnect resync, visibility flush after the socket
+  //    died) → full fetch, because we can't know what was missed.
+  const incrementalSafeRef = useRef(false);
+  const needsFullFetchRef = useRef(false);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+  useEffect(() => {
+    function onChatEvent(event: Event) {
+      const detail = (event as CustomEvent<LiveRoomEventDetail>).detail;
+      if (detail?.resource !== "chat") return;
+      const action = detail.action || "";
+      if (action === "typing") return; // transient UI only, never refetched
+      if (action === "message" || action === "read") incrementalSafeRef.current = true;
+      else needsFullFetchRef.current = true;
+    }
+    window.addEventListener(LIVE_ROOM_EVENT, onChatEvent);
+    return () => window.removeEventListener(LIVE_ROOM_EVENT, onChatEvent);
+  }, []);
+
   const reloadThread = useCallback(async () => {
+    const incremental = incrementalSafeRef.current && !needsFullFetchRef.current;
+    incrementalSafeRef.current = false;
+    needsFullFetchRef.current = false;
+    const prev = messagesRef.current;
+    const after = incremental && prev.length > 0
+      ? prev.reduce((max, m) => Math.max(max, m.seq), 0)
+      : undefined;
     try {
-      const thread = await getChat(workspace.id);
-      setState((current) => (current.kind === "ready" ? { ...current, messages: thread.messages, readCursors: thread.readCursors, readAt: thread.readAt || {} } : current));
+      const thread = await getChat(workspace.id, after);
+      setState((current) => (current.kind === "ready"
+        ? {
+            ...current,
+            messages: mergeThreadMessages(current.messages, thread.messages, after !== undefined),
+            readCursors: thread.readCursors,
+            readAt: thread.readAt || {},
+          }
+        : current));
     } catch {
-      // Transient — the next live event or visibility change retries.
+      // Transient — the next live event or visibility change retries. Require
+      // a full fetch then so a failed incremental can't drop events.
+      needsFullFetchRef.current = true;
     }
   }, [workspace.id, setState]);
 
@@ -529,11 +581,15 @@ function ChatRoom({
   async function handleSendImage(file: File) {
     if (sending) return;
     if (!file.type.startsWith("image/")) { setSendError("Only images can be sent right now."); return; }
-    if (file.size > 12 * 1024 * 1024) { setSendError("Image is too large (max 12 MB)."); return; }
     setSending(true);
     setSendError("");
     try {
-      const uploaded = await uploadChatImage({ workspaceId: workspace.id, file });
+      // Downscale + strip EXIF (incl. GPS) before encrypting; size-check the
+      // bytes we actually upload, so a 40 MP original that normalizes to
+      // ~300 KB is no longer rejected for its pre-shrink size.
+      const normalized = await normalizeImageForUpload(file);
+      if (normalized.size > 12 * 1024 * 1024) { setSendError("Image is too large (max 12 MB)."); setSending(false); return; }
+      const uploaded = await uploadChatImage({ workspaceId: workspace.id, file: normalized });
       const { message } = await sendChatMessage({ workspaceId: workspace.id, text: "", e2ee, media: uploaded });
       setState((current) => (current.kind === "ready"
         ? { ...current, messages: mergeMessage(current.messages, message) }
@@ -585,9 +641,17 @@ function ChatRoom({
   // Render in canonical seq order so an optimistic message that reconciles after
   // a mid-flight reload still lands in the right place (the array itself is kept
   // in arrival order; sorting a copy keeps seq-derived state untouched).
-  const grouped = useMemo(
-    () => groupByDay(messages.slice().sort((a, b) => a.seq - b.seq)),
+  const sortedMessages = useMemo(
+    () => messages.slice().sort((a, b) => a.seq - b.seq),
     [messages],
+  );
+  // Window the RENDER only (state/lookups keep the full list). New messages
+  // land inside the window because the slice anchors to the end.
+  const [visibleCount, setVisibleCount] = useState(CHAT_WINDOW_INITIAL);
+  const hiddenCount = Math.max(0, sortedMessages.length - visibleCount);
+  const grouped = useMemo(
+    () => groupByDay(hiddenCount > 0 ? sortedMessages.slice(-visibleCount) : sortedMessages),
+    [sortedMessages, visibleCount, hiddenCount],
   );
   const messagesById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
   const lastMineSeq = useMemo(() => messages.filter((m) => m.email.toLowerCase() === myEmail && !m.deletedAt).reduce((max, m) => Math.max(max, m.seq), 0), [messages, myEmail]);
@@ -691,6 +755,19 @@ function ChatRoom({
               </div>
             ))
           )}
+          {/* DOM-last inside column-reverse = visual top, exactly where the
+              older history "continues". */}
+          {hiddenCount > 0 && (
+            <div className="chat-load-earlier-row">
+              <button
+                type="button"
+                className="chat-load-earlier pressable"
+                onClick={() => setVisibleCount((count) => count + CHAT_WINDOW_STEP)}
+              >
+                Show earlier messages ({hiddenCount})
+              </button>
+            </div>
+          )}
         </div>
 
         {sendError && <p className="chat-error" role="alert">{sendError}</p>}
@@ -729,6 +806,7 @@ function ChatRoom({
             </div>
             <div
               className="chat-gif-grid"
+              ref={gifGridRef}
               onScroll={(e) => {
                 const el = e.currentTarget;
                 if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) void loadMoreGifs();
@@ -744,25 +822,12 @@ function ChatRoom({
                 [0, 1].map((col) => (
                   <div key={col} className="chat-gif-col">
                     {gifResults.filter((_, i) => i % 2 === col).map((gif) => (
-                      <button
+                      <PickerGifTile
                         key={gif.id}
-                        type="button"
-                        className="chat-gif-tile pressable"
-                        onClick={() => void sendGif(gif.id)}
-                        aria-label="Send this GIF"
-                      >
-                        {/* Plays muted/looping like Giphy; poster is the still
-                            fallback while it loads or if autoplay is blocked. */}
-                        <video
-                          src={gif.sd || gif.hd}
-                          poster={gif.poster}
-                          muted
-                          loop
-                          autoPlay
-                          playsInline
-                          preload="metadata"
-                        />
-                      </button>
+                        gif={gif}
+                        gridRef={gifGridRef}
+                        onSend={() => void sendGif(gif.id)}
+                      />
                     ))}
                   </div>
                 ))
@@ -1149,10 +1214,22 @@ type GifState =
   | { kind: "failed" };
 
 function ChatGif({ gifId, sourceUrl }: { gifId: string; sourceUrl: string }) {
+  // Reveal-gated like Off the Shelf: a thread GIF opens HIDDEN behind a gradient
+  // placeholder and only plays after a Reveal tap — nothing is fetched or
+  // decoded until then, and it can be hidden again. Reveal state is local (each
+  // viewer/device reveals on its own) and resets to hidden on reload.
+  const [revealed, setRevealed] = useState(false);
   const [state, setState] = useState<GifState>({ kind: "loading" });
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // Every historical GIF in the thread used to keep a looping <video> decoding
+  // forever. iOS caps concurrent video decoders, so a GIF-heavy thread froze
+  // later clips and burned battery. Play only near the viewport; fully detach
+  // (src removed) when scrolled away so the decoder + network are released.
+  const [viewRef, inView] = useInView<HTMLDivElement>({ once: false, rootMargin: "300px 0px 300px 0px", threshold: 0 });
 
+  // Resolve ONLY after reveal — an unrevealed GIF costs zero network/decode.
   useEffect(() => {
+    if (!revealed) return;
     let cancelled = false;
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1170,64 +1247,177 @@ function ChatGif({ gifId, sourceUrl }: { gifId: string; sourceUrl: string }) {
       })
       .catch(() => { if (!cancelled) setState({ kind: "failed" }); });
     return () => { cancelled = true; controller.abort(); };
-  }, [gifId, sourceUrl]);
+  }, [revealed, gifId, sourceUrl]);
 
   useEffect(() => {
-    if (state.kind !== "ready" || !videoRef.current) return;
-    // iOS only autoplays when muted is set as a DOM property, not just the
-    // attribute — React doesn't always reflect it, so force it here.
+    if (!revealed || state.kind !== "ready" || !videoRef.current) return;
     const video = videoRef.current;
-    video.muted = true;
-    video.defaultMuted = true;
-    video.play().catch(() => {});
-  }, [state]);
+    if (inView) {
+      if (!video.getAttribute("src")) {
+        video.src = state.src;
+        video.load();
+      }
+      // iOS only autoplays when muted is set as a DOM property, not just the
+      // attribute — React doesn't always reflect it, so force it here.
+      video.muted = true;
+      video.defaultMuted = true;
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+      // Detaching src (not just pausing) is what actually frees the iOS
+      // decoder slot and stops the stream; the poster keeps the visual.
+      video.removeAttribute("src");
+      video.load();
+    }
+  }, [revealed, state, inView]);
 
-  if (state.kind === "failed") {
-    // Server-side resolution didn't return a direct URL (RedGifs rate-limits
-    // Cloudflare's egress, so /api/redgifs often can't reach it). The browser
-    // can still load RedGifs' own embed directly, so fall back to the iframe —
-    // it plays inline rather than bouncing the user out to Safari.
-    return (
-      <iframe
-        src={`https://www.redgifs.com/ifr/${gifId}?hd=1&autoplay=1&muted=1`}
-        title="GIF"
-        className="chat-gif-frame"
-        allow="autoplay; encrypted-media"
-        loading="lazy"
-      />
-    );
-  }
-  if (state.kind === "loading") {
-    return <span className="chat-gif-frame chat-gif-loading" aria-label="Loading GIF" />;
-  }
+  // ONE wrapper carries the IntersectionObserver ref across ALL states.
+  // useInView attaches its observer in a mount effect — when the ref'd
+  // element only existed in the "ready" branch, the observer bound to null
+  // during the resolve and never re-attached, so inView stayed false and no
+  // GIF ever got a src (v1.2.145 regression: "GIFs aren't playing").
   return (
-    <video
-      ref={videoRef}
-      className="chat-gif-video"
-      src={state.src}
-      poster={state.poster || undefined}
-      muted
-      autoPlay
-      loop
-      playsInline
-      preload="metadata"
-      disablePictureInPicture
-      onCanPlay={(e) => { e.currentTarget.muted = true; e.currentTarget.play().catch(() => {}); }}
-    />
+    <div ref={viewRef} className={`chat-gif-inview ${revealed ? "is-revealed" : ""}`}>
+      {!revealed ? (
+        // Hidden by default. The button is interactive (the video states keep
+        // pointer-events:none so a long-press still reaches the bubble for
+        // react/reply); stopPropagation so revealing doesn't also toggle the
+        // bubble's action row.
+        <button
+          type="button"
+          className="chat-gif-hidden pressable"
+          onClick={(e) => { e.stopPropagation(); setRevealed(true); }}
+          aria-label="Reveal GIF"
+        >
+          <span className="chat-gif-art" aria-hidden="true">
+            <span className="art-base" />
+            <span className="art-bloom-a" />
+            <span className="art-bloom-b" />
+            <span className="art-vignette" />
+          </span>
+          <span className="chat-gif-reveal-label">🎞️ Reveal</span>
+        </button>
+      ) : (
+        <>
+          {state.kind === "failed" ? (
+            // Server-side resolution didn't return a direct URL (RedGifs
+            // rate-limits Cloudflare's egress, so /api/redgifs often can't reach
+            // it). The browser can still load RedGifs' own embed directly, so
+            // fall back to the iframe — it plays inline rather than bouncing the
+            // user out to Safari.
+            <iframe
+              src={`https://www.redgifs.com/ifr/${gifId}?hd=1&autoplay=1&muted=1`}
+              title="GIF"
+              className="chat-gif-frame"
+              allow="autoplay; encrypted-media"
+              loading="lazy"
+            />
+          ) : state.kind === "loading" ? (
+            <span className="chat-gif-frame chat-gif-loading" aria-label="Loading GIF" />
+          ) : (
+            // No src attribute — playback is attach/detach-managed by the
+            // in-view effect above; the video keeps its class and sizing.
+            <video
+              ref={videoRef}
+              className="chat-gif-video"
+              poster={state.poster || undefined}
+              muted
+              loop
+              playsInline
+              preload="none"
+              disablePictureInPicture
+              onCanPlay={(e) => { e.currentTarget.muted = true; e.currentTarget.play().catch(() => {}); }}
+            />
+          )}
+          <button
+            type="button"
+            className="chat-gif-hide pressable"
+            onClick={(e) => { e.stopPropagation(); setRevealed(false); setState({ kind: "loading" }); }}
+            aria-label="Hide GIF"
+          >
+            Hide
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Picker tile — autoplays like Giphy, but only while near the picker's visible
+// area. The observer's root is the grid's own scroll container, so off-screen
+// tiles pause + DETACH their src; infinite scroll then can't pile up 40-80
+// concurrent decoders / ~100 MB of streaming (the reason the tiles were static
+// posters in v1.2.145). Poster shows before play / if autoplay is blocked.
+function PickerGifTile({ gif, gridRef, onSend }: {
+  gif: RedgifsSearchResult;
+  gridRef: RefObject<HTMLDivElement | null>;
+  onSend: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [tileRef, inView] = useInView<HTMLButtonElement>({
+    once: false,
+    root: gridRef,
+    rootMargin: "200px 0px 200px 0px",
+    threshold: 0,
+  });
+  const src = gif.sd || gif.hd;
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (inView) {
+      if (!el.getAttribute("src")) {
+        el.src = src;
+        el.load();
+      }
+      el.muted = true;
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+      el.removeAttribute("src");
+      el.load();
+    }
+  }, [inView, src]);
+
+  return (
+    <button
+      ref={tileRef}
+      type="button"
+      className="chat-gif-tile pressable"
+      onClick={onSend}
+      aria-label="Send this GIF"
+    >
+      <video
+        ref={videoRef}
+        poster={gif.poster}
+        muted
+        loop
+        playsInline
+        preload="none"
+        disablePictureInPicture
+      />
+    </button>
   );
 }
 
 function ChatImage({ workspaceId, media, onOpen }: { workspaceId: string; media: ChatMedia; onOpen?: () => void }) {
   const [url, setUrl] = useState("");
   const [failed, setFailed] = useState(false);
+  // Fetch + decrypt only when the bubble approaches the viewport. Every image
+  // in the thread used to do this eagerly on mount — opening a thread with 30
+  // photos meant ~30 full downloads + AES decrypts before you scrolled at all.
+  // once:true — after decode we keep the object URL; re-gating on scroll-out
+  // would just churn createObjectURL against the (still-cached) blob.
+  const [viewRef, inView] = useInView<HTMLSpanElement>({ once: true, rootMargin: "600px 0px 600px 0px", threshold: 0 });
 
   useEffect(() => {
+    if (!inView) return;
     let cancelled = false;
     let objectUrl = "";
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUrl("");
     setFailed(false);
-    getChatImageBlob({ workspaceId, media })
+    getChatImageBlobCached({ workspaceId, media })
       .then((blob) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
@@ -1235,20 +1425,23 @@ function ChatImage({ workspaceId, media, onOpen }: { workspaceId: string; media:
       })
       .catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [workspaceId, media.mediaId, media.key, media.iv]);
+  }, [inView, workspaceId, media.mediaId, media.key, media.iv]);
 
   if (failed) return <span className="chat-image-status">Image unavailable</span>;
-  if (!url) return <span className="chat-image-status" aria-label="Loading image">Loading…</span>;
+  // The ref span doubles as the not-yet-visible placeholder (same reserved
+  // min-height as the loading state, so no scroll jump when it fills in).
+  if (!url) return <span ref={viewRef} className="chat-image-status" aria-label="Loading image">Loading…</span>;
   // Decrypted blob object URL — next/image can't take these, so a plain img.
   // Tap opens the fullscreen, pinch-zoomable lightbox; stopPropagation keeps the
-  // tap from also toggling the bubble's action row. The lightbox re-decrypts its
-  // own copy, so this short-lived object URL can be revoked without breaking it.
+  // tap from also toggling the bubble's action row. The lightbox reads the same
+  // blob through the LRU, so revoking this URL on unmount stays safe.
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url}
       alt="Shared image"
       className="chat-image"
+      decoding="async"
       onClick={(e) => { if (onOpen) { e.stopPropagation(); onOpen(); } }}
     />
   );
@@ -1259,6 +1452,55 @@ function mergeMessage(messages: ChatMessage[], message: ChatMessage): ChatMessag
     return messages.map((m) => (m.id === message.id ? message : m));
   }
   return [...messages, message];
+}
+
+function sameReactions(a: ChatReaction[] | undefined, b: ChatReaction[] | undefined): boolean {
+  const x = a || [];
+  const y = b || [];
+  if (x.length !== y.length) return false;
+  for (let i = 0; i < x.length; i += 1) {
+    if (x[i].by !== y[i].by || x[i].emoji !== y[i].emoji) return false;
+  }
+  return true;
+}
+
+// Everything a bubble renders from its message prop. media key/iv never change
+// for a given mediaId, so the id stands in for the whole object.
+function sameRenderedMessage(a: ChatMessage, b: ChatMessage): boolean {
+  return a.id === b.id
+    && a.seq === b.seq
+    && a.text === b.text
+    && (a.editedAt || "") === (b.editedAt || "")
+    && (a.deletedAt || "") === (b.deletedAt || "")
+    && Boolean(a.e2eeLocked) === Boolean(b.e2eeLocked)
+    && Boolean(a.pending) === Boolean(b.pending)
+    && (a.replyToId || "") === (b.replyToId || "")
+    && (a.media?.mediaId || "") === (b.media?.mediaId || "")
+    && sameReactions(a.reactions, b.reactions);
+}
+
+// Reconcile a reload with current state WITHOUT breaking object identity:
+// ChatBubbleMemo skips a bubble only while `prev.message === next.message`, so
+// a wholesale replace used to re-render all ~N bubbles on every partner event.
+//  - incremental (`after` fetch): fetched holds only NEW messages — merge them
+//    into the existing list, which keeps every old reference by construction.
+//  - full fetch: adopt the server's list but reuse the previous object for any
+//    message whose rendered content is unchanged; if nothing changed at all,
+//    return the previous array so React skips the state update entirely.
+function mergeThreadMessages(prev: ChatMessage[], fetched: ChatMessage[], incremental: boolean): ChatMessage[] {
+  if (incremental) {
+    if (fetched.length === 0) return prev;
+    let next = prev;
+    for (const message of fetched) next = mergeMessage(next, message);
+    return next;
+  }
+  const prevById = new Map(prev.map((m) => [m.id, m]));
+  const merged = fetched.map((message) => {
+    const old = prevById.get(message.id);
+    return old && sameRenderedMessage(old, message) ? old : message;
+  });
+  const identical = merged.length === prev.length && merged.every((m, i) => m === prev[i]);
+  return identical ? prev : merged;
 }
 
 // Mirrors the server's per-(person, emoji) toggle (functions/api/chat.js react

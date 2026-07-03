@@ -196,8 +196,13 @@ export async function loadPrivateNotes(): Promise<PrivateNote[]> {
     .slice(0, MAX_NOTES);
 
   // Re-persist encrypted. This upgrades any legacy plaintext that was just
-  // merged in, and rewrites the canonical key as ciphertext.
-  await persistEncrypted(merged);
+  // merged in, and rewrites the canonical key as ciphertext. Only after the
+  // encrypted copy has verifiably landed do we delete the legacy plaintext
+  // originals — otherwise the intimate free text they hold would sit in
+  // localStorage forever (they are not `ss:`-prefixed, so the sign-out sweep
+  // used to miss them too).
+  const persisted = await persistEncrypted(merged);
+  if (persisted) purgeLegacyPlaintext();
   return merged;
 }
 
@@ -215,14 +220,33 @@ export async function privateNoteCount(): Promise<number> {
 
 // --- Internals -------------------------------------------------------------
 
-async function persistEncrypted(notes: PrivateNote[]): Promise<void> {
+async function persistEncrypted(notes: PrivateNote[]): Promise<boolean> {
   try {
     const blob = await encryptNotes(notes);
     window.localStorage.setItem(PRIVATE_NOTES_STORAGE_KEY, JSON.stringify(blob));
+    return true;
   } catch {
     // If encryption/storage fails we deliberately do NOT fall back to writing
     // plaintext — leaving the previous value in place is safer than silently
     // persisting the notes unencrypted.
+    return false;
+  }
+}
+
+/**
+ * Delete the pre-encryption plaintext note keys. Called only after the merged
+ * encrypted blob has persisted successfully, so this never destroys the only
+ * copy. Idempotent; iterates backwards because removeItem reindexes.
+ */
+function purgeLegacyPlaintext(): void {
+  try {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.localStorage.key(index);
+      if (key && key.startsWith(LEGACY_PREFIX)) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage unavailable — the sign-out sweep is the backstop.
   }
 }
 

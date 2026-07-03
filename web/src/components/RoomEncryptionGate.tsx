@@ -246,26 +246,35 @@ export default function RoomEncryptionGate({ children }: { children: ReactNode }
       reduced = reduceQuery.matches;
       if (reduced) settle();
     };
-    const onMove = (event: PointerEvent) => {
-      if (reduced) return;
-      const rect = surface.getBoundingClientRect();
-      tx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-      ty = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-    };
+    // Demand-driven rAF: the loop runs only while the eased values are still
+    // chasing the pointer, then stops. The old unconditional loop wrote two
+    // custom properties every frame for the whole life of the gate screen —
+    // style recalc + no CPU idle even with the pointer untouched.
     const tick = () => {
       if (!reduced) {
         cx += (tx - cx) * 0.06;
         cy += (ty - cy) * 0.06;
         stage.style.setProperty("--tx", cx.toFixed(3));
         stage.style.setProperty("--ty", cy.toFixed(3));
+        if (Math.abs(tx - cx) + Math.abs(ty - cy) > 0.001) {
+          raf = requestAnimationFrame(tick);
+          return;
+        }
       }
-      raf = requestAnimationFrame(tick);
+      raf = 0; // converged (or reduced motion) — go idle until the next move
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
+    const onMove = (event: PointerEvent) => {
+      if (reduced) return;
+      const rect = surface.getBoundingClientRect();
+      tx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+      ty = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+      kick();
     };
 
     surface.addEventListener("pointermove", onMove);
     surface.addEventListener("pointerleave", settle);
     reduceQuery.addEventListener("change", onMotionChange);
-    raf = requestAnimationFrame(tick);
     return () => {
       surface.removeEventListener("pointermove", onMove);
       surface.removeEventListener("pointerleave", settle);

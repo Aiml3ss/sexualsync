@@ -415,6 +415,7 @@ export type RequestStatus =
   | "draft"
   | "pending"
   | "sent"
+  | "maybe"
   | "reviewed"
   | "on_deck"
   | "completed"
@@ -465,6 +466,11 @@ export interface RequestRecord {
   passedAt?: string;
   passedByEmail?: string;
   passedByName?: string;
+  // Set when the reviewer defers ("Maybe") instead of giving a final answer.
+  // The Ask stays repliable; these only record who deferred and when.
+  maybeAt?: string;
+  maybeByEmail?: string;
+  maybeByName?: string;
   createdAt: string;
   updatedAt: string;
   sentAt?: string;

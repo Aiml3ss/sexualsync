@@ -76,15 +76,27 @@ function base64ToBytes(value: string): Uint8Array {
   return bytes;
 }
 
+// Ephemeral fallback for storage-denied environments (Safari private mode's
+// QuotaExceededError on setItem, cookie-blocked Chromium's SecurityError on
+// the accessor itself). Mirrors device-cipher.ts: encryption keeps working
+// for the tab's lifetime; records queued under an ephemeral secret just
+// can't decrypt after a reload — the flush loop already tolerates that.
+let ephemeralQueueSecret: Uint8Array | null = null;
+
 function readOrCreateQueueSecret(): Uint8Array {
-  if (typeof window === "undefined" || !window.localStorage) {
-    throw new Error("Offline queue encryption requires localStorage.");
+  if (typeof window === "undefined") {
+    throw new Error("Offline queue encryption requires a browser context.");
   }
-  const existing = window.localStorage.getItem(QUEUE_SECRET_KEY);
-  if (existing) return base64ToBytes(existing);
-  const secret = crypto.getRandomValues(new Uint8Array(32));
-  window.localStorage.setItem(QUEUE_SECRET_KEY, bytesToBase64(secret));
-  return secret;
+  try {
+    const existing = window.localStorage.getItem(QUEUE_SECRET_KEY);
+    if (existing) return base64ToBytes(existing);
+    const secret = crypto.getRandomValues(new Uint8Array(32));
+    window.localStorage.setItem(QUEUE_SECRET_KEY, bytesToBase64(secret));
+    return secret;
+  } catch {
+    if (!ephemeralQueueSecret) ephemeralQueueSecret = crypto.getRandomValues(new Uint8Array(32));
+    return ephemeralQueueSecret;
+  }
 }
 
 function getQueueKey(): Promise<CryptoKey> {
@@ -172,6 +184,10 @@ function openDb(): Promise<IDBDatabase> {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("IndexedDB open failed."));
   });
+  // Don't cache a rejection: one transient IDB failure (private-mode denial
+  // that the user later lifts, a blocked open) shouldn't disable queueing for
+  // the rest of the tab's life. Mirrors getQueueKey's reset above.
+  dbPromise.catch(() => { dbPromise = null; });
   return dbPromise;
 }
 
@@ -201,7 +217,22 @@ export function generateIdempotencyKey(): string {
   return Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join("");
 }
 
+// Queued writes are the one piece of state whose eviction breaks a promise
+// ("will send when you're back online"), so ask the browser to exempt our
+// storage from pressure eviction the first time something is actually queued.
+// One-shot and best-effort: browsers may prompt (Firefox) or silently decide.
+let persistenceRequested = false;
+
+function requestStoragePersistence(): void {
+  if (persistenceRequested) return;
+  persistenceRequested = true;
+  try {
+    void navigator.storage?.persist?.().catch(() => {});
+  } catch { /* unsupported / restricted context */ }
+}
+
 export async function enqueueWrite(record: Omit<QueuedWriteRecord, "id" | "enqueuedAt" | "lastTriedAt" | "attempts">): Promise<number> {
+  requestStoragePersistence();
   const now = Date.now();
   const full: QueuedWriteRecord = {
     ...record,
@@ -345,7 +376,11 @@ let listenersInstalled = false;
 export function installOfflineQueueListeners(): void {
   if (listenersInstalled || typeof window === "undefined") return;
   listenersInstalled = true;
-  const trigger = () => { void flushOfflineQueue(); };
+  // Swallow flush failures: with IndexedDB blocked (Firefox private mode,
+  // Safari Lockdown) openDb rejects, and this trigger fires on mount + every
+  // focus/online/visibilitychange — an unguarded `void` here means a recurring
+  // unhandled promise rejection for the tab's whole life.
+  const trigger = () => { flushOfflineQueue().catch(() => {}); };
   window.addEventListener("online", trigger);
   window.addEventListener("focus", trigger);
   document.addEventListener("visibilitychange", () => {

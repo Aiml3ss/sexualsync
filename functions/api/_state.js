@@ -84,7 +84,12 @@ export async function readKeyStrong(env, storeName, key) {
   const fullKey = `${storeName}:${key}`;
   try {
     const read = await doRequest(env, fullKey, "/state/read", { key: fullKey });
-    if (read && read.ok) return await decodeStoredJson(env, fullKey, read.value ?? null);
+    if (read && read.ok) {
+      if (read.value !== null && read.value !== undefined) {
+        return await decodeStoredJson(env, fullKey, read.value);
+      }
+      return getStore(env, storeName).get(key, { type: "json" });
+    }
   } catch {
     // Coordinator hiccup — fall back to KV rather than fail the read.
   }
@@ -120,7 +125,9 @@ export async function mutateKey(env, storeName, key, transform, { attempts = DEF
     // encryption is active. Decode before the transform and re-encode before
     // the CAS write so the transform always sees plaintext JSON while KV only
     // ever holds envelopes (mirrors getStore()'s get/setJSON seam).
-    const currentValue = await decodeStoredJson(env, fullKey, read.value ?? null);
+    const currentValue = read.value !== null && read.value !== undefined
+      ? await decodeStoredJson(env, fullKey, read.value)
+      : await getStore(env, storeName).get(key, { type: "json" });
     const { value, result, write = true } = transform(currentValue) || {};
     if (!write) return result === undefined ? currentValue : result;
     const cas = await doRequest(env, fullKey, "/state/cas", {
@@ -195,7 +202,11 @@ export async function mutateRecord(env, recordName, storeName, keys, transform, 
     // active) so the transform sees plaintext; re-encode every write below.
     const current = {};
     await Promise.all(keys.map(async (k) => {
-      current[k] = await decodeStoredJson(env, `${storeName}:${k}`, read.values?.[`${storeName}:${k}`] ?? null);
+      const fullKey = `${storeName}:${k}`;
+      const rawValue = read.values?.[fullKey];
+      current[k] = rawValue !== null && rawValue !== undefined
+        ? await decodeStoredJson(env, fullKey, rawValue)
+        : await getStore(env, storeName).get(k, { type: "json" });
     }));
 
     const out = transform(current) || {};

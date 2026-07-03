@@ -15,6 +15,11 @@
 /index.html
   Cache-Control: no-cache
 
+# Pages normalizes `/index.html` to `/`, so the rule above likely never
+# matches a real request — cover the canonical path explicitly.
+/
+  Cache-Control: no-cache
+
 /manifest.webmanifest
   Cache-Control: no-cache
 

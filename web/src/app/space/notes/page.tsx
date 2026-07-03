@@ -136,8 +136,14 @@ function PrivateNoteCard({
   useEffect(() => {
     const input = noteInputRef.current;
     if (!input) return;
-    input.style.height = "0px";
-    input.style.height = `${input.scrollHeight}px`;
+    // Defer the scrollHeight read/write off the keystroke's critical path so
+    // the forced reflow doesn't land on every character — same pattern as the
+    // Sext composer (chat/page.tsx).
+    const raf = requestAnimationFrame(() => {
+      input.style.height = "0px";
+      input.style.height = `${input.scrollHeight}px`;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [note.text]);
 
   return (

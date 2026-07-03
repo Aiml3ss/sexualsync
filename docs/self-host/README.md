@@ -73,5 +73,4 @@ It does **not** permit commercial or public hosted-service use: you may not use
 the software to provide a hosted, commercial, public, or production service. The
 copyright holder operates Sexualsync commercially as the licensor and retains
 all rights to do so; the "Sexualsync" name and brand assets are reserved. For a
-commercial license, contact the copyright holder through the project's source
-repository.
+commercial license, contact hello@sexualsync.io.

@@ -126,6 +126,14 @@ export function useLiveRoomReload({
     let reloadQueued = false;
     let lastReloadAt = 0;
     let lastEventSeq = readStoredSeq(liveWorkspaceId);
+    // Liveness: any inbound frame proves the socket is real. Mobile networks
+    // produce half-open sockets (readyState OPEN, peer long gone) that never
+    // fire `close` — without a receive-side deadline we'd keep "sending"
+    // heartbeats into the void until the OS notices. 90s ≈ two heartbeat
+    // rounds plus slack for background-tab timer throttling (~1/min), so a
+    // healthy-but-throttled tab never trips it.
+    const LIVENESS_TIMEOUT_MS = 90_000;
+    let lastInboundAt = 0;
 
     function rememberSeq(value: unknown) {
       const seq = normalizeSeq(value);
@@ -202,10 +210,16 @@ export function useLiveRoomReload({
           retryResetTimer = null;
         }, 10_000);
         clearHeartbeat();
+        lastInboundAt = Date.now();
         heartbeat = window.setInterval(() => {
-          if (socket?.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: "heartbeat" }));
+          if (socket?.readyState !== WebSocket.OPEN) return;
+          if (Date.now() - lastInboundAt > LIVENESS_TIMEOUT_MS) {
+            // Dead peer: force the close path so the jittered reconnect (and
+            // its resync-on-open) takes over instead of a zombie connection.
+            try { socket.close(); } catch { /* already gone */ }
+            return;
           }
+          socket.send(JSON.stringify({ type: "heartbeat" }));
         }, 25_000);
         // The WS replay buffer is capped server-side, so a client that was
         // offline past the cap would silently miss events. Treat every
@@ -219,6 +233,8 @@ export function useLiveRoomReload({
       });
 
       socket.addEventListener("message", (event) => {
+        // Any frame (hello/event/presence/pong) counts as proof of life.
+        lastInboundAt = Date.now();
         const message = parseMessage(event);
         if (!message) return;
         if (message.type === "room.hello") {

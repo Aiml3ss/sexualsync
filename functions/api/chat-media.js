@@ -34,6 +34,14 @@ export async function onRequest(context) {
   if (!access.ok) return access.response;
 
   if (method === "POST") {
+    // Reject by declared length BEFORE buffering: on the self-host runtime
+    // there is no platform body cap upstream, so `arrayBuffer()` on an
+    // oversized POST would buffer the whole thing in Node heap just to
+    // refuse it. content-length can lie, so the post-read check stays.
+    const declaredBytes = Number(context.request.headers.get("content-length") || 0);
+    if (declaredBytes > MAX_CHAT_MEDIA_BYTES) {
+      return jsonResponse(413, { error: "Image is too large (max 12 MB)." });
+    }
     const body = await context.request.arrayBuffer();
     if (!body || body.byteLength === 0) return jsonResponse(400, { error: "Empty media body." });
     if (body.byteLength > MAX_CHAT_MEDIA_BYTES) return jsonResponse(413, { error: "Image is too large (max 12 MB)." });
@@ -49,14 +57,16 @@ export async function onRequest(context) {
     if (!id) return jsonResponse(400, { error: "id required." });
     const object = await bucket.get(chatMediaKey(access.workspace.id, id));
     if (!object?.body) return jsonResponse(404, { error: "Media not found." });
-    return new Response(object.body, {
-      status: 200,
-      headers: {
-        "content-type": "application/octet-stream",
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff",
-      },
-    });
+    const headers = {
+      "content-type": "application/octet-stream",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    };
+    // Download progress + a sane client abort point; mirrors vault-media.
+    if (Number.isFinite(object.size) && object.size > 0) {
+      headers["content-length"] = String(object.size);
+    }
+    return new Response(object.body, { status: 200, headers });
   }
 
   return jsonResponse(405, { error: "Method not allowed." });

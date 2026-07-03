@@ -296,6 +296,85 @@ test("requester cannot use the direct reply action for their own sent request", 
   assert.equal(res.status, 403);
 });
 
+test("reviewer can mark a sent Ask as maybe; it stays repliable and stamps maybeAt not reviewedAt", async () => {
+  const e = await setup([req("r1", {
+    requesterEmail: PARTNER, reviewerEmail: ME, requester: "Partner", reviewer: "Me",
+  })]);
+
+  const res = await call(e, "PATCH", { id: "r1", action: "maybe", workspaceId: "w1" });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.request.status, "maybe");
+  assert.equal(body.request.maybeByEmail, ME);
+  assert.ok(body.request.maybeAt);
+  // A maybe is NOT a final answer — no reviewedAt/decisions, so it still reads
+  // as unanswered and stays available to convert.
+  assert.equal(body.request.reviewedAt, undefined);
+  assert.deepEqual(body.request.decisions, []);
+  // Still surfaced as active (not history).
+  assert.equal(body.activeRequests.some((r) => r.id === "r1"), true);
+
+  const stored = await readRequests(e);
+  assert.equal(stored.find((r) => r.id === "r1").status, "maybe");
+});
+
+test("requester cannot mark their own Ask as maybe", async () => {
+  const e = await setup([req("r1")]); // ME is requester, PARTNER reviewer
+  const res = await call(e, "PATCH", { id: "r1", action: "maybe", workspaceId: "w1" });
+  assert.equal(res.status, 403);
+});
+
+test("cannot mark an already-reviewed Ask as maybe", async () => {
+  const e = await setup([req("r1", {
+    requesterEmail: PARTNER, reviewerEmail: ME, requester: "Partner", reviewer: "Me",
+    status: "reviewed", reviewedByEmail: ME, reviewedAt: NOW,
+    decisions: [{ label: "Massage", decision: "Yes", targetType: "act" }],
+  })]);
+  const res = await call(e, "PATCH", { id: "r1", action: "maybe", workspaceId: "w1" });
+  assert.equal(res.status, 409);
+});
+
+test("a maybe can be converted to a real answer via reply (Decide now)", async () => {
+  const e = await setup([req("r1", {
+    requesterEmail: PARTNER, reviewerEmail: ME, requester: "Partner", reviewer: "Me",
+    status: "maybe", maybeByEmail: ME, maybeAt: NOW,
+  })]);
+
+  const res = await call(e, "PATCH", {
+    id: "r1", action: "reply", workspaceId: "w1",
+    decisions: [{ label: "Massage", decision: "Yes", targetType: "act" }],
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.request.status, "reviewed");
+  assert.equal(body.request.decisions[0].decision, "Yes");
+  assert.equal(body.request.reviewedByEmail, ME);
+});
+
+test("GET expires a maybe once its timing window passes", async () => {
+  const oldSentAt = "2026-04-01T06:30:00.000Z";
+  const now = "2026-06-06T15:00:00.000Z";
+  const e = await setup([req("r-maybe-old", {
+    requesterEmail: PARTNER, reviewerEmail: ME, requester: "Partner", reviewer: "Me",
+    status: "maybe", timing: "Tomorrow",
+    sentAt: oldSentAt, createdAt: oldSentAt, updatedAt: "2026-06-06T14:00:00.000Z",
+    maybeByEmail: ME, maybeAt: "2026-04-01T07:00:00.000Z",
+  })]);
+
+  mock.timers.enable({ apis: ["Date"], now: new Date(now) });
+  try {
+    const res = await board({ request: new Request("http://localhost/api/request-board?workspaceId=w1"), env: e });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.activeRequests.some((r) => r.id === "r-maybe-old"), false);
+    const expired = (await readRequests(e)).find((r) => r.id === "r-maybe-old");
+    assert.equal(expired.status, "expired");
+    assert.equal(expired.expiredReason, "unanswered_stale");
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 // THE core race: two different requests edited at once must both survive.
 // Without the CAS coordinator, one blind write clobbers the other.
 test("concurrent edits to different requests do NOT lose updates", async () => {

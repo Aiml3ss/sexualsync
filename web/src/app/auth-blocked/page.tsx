@@ -39,7 +39,7 @@ export default function AuthBlockedPage() {
         <p className="auth-blocked-foot">
           Still stuck? Open the page in a regular browser tab, sign in there,
           then come back to the installed app. Check that cookies are allowed
-          for this site.
+          for sexualsync.io.
         </p>
       </section>
     </main>

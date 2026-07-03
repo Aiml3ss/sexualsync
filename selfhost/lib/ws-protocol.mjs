@@ -45,25 +45,44 @@ export function encodeFrame(opcode, payload = Buffer.alloc(0)) {
   return Buffer.concat([header, data]);
 }
 
+// Room-protocol messages are small JSON (heartbeat/presence; the HTTP
+// /broadcast seam caps events at 4 KB). 64 KB is generous headroom while
+// still bounding what a client-declared frame length can make us allocate —
+// without a cap, a single crafted header could OOM the Node process.
+export const MAX_INBOUND_FRAME_BYTES = 64 * 1024;
+
 // Streaming parser for incoming (client -> server, masked) frames. Feed chunks
 // with push(); it invokes the handler callbacks for each complete message.
+// A frame declaring a length above MAX_INBOUND_FRAME_BYTES calls
+// handlers.onOversized (the connection should close 1009) and the parser goes
+// dead — nothing after a protocol violation is trustworthy.
 export class FrameParser {
   constructor() {
     this.buf = Buffer.alloc(0);
     this.fragments = [];
     this.fragmentOpcode = null;
+    this.dead = false;
   }
 
   push(chunk, handlers) {
+    if (this.dead) return;
     this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : Buffer.from(chunk);
     for (;;) {
       const frame = this._tryParse();
       if (!frame) break;
       this._dispatch(frame, handlers);
+      if (this.oversized) break;
+    }
+    if (this.oversized) {
+      this.dead = true;
+      this.buf = Buffer.alloc(0);
+      this.fragments = [];
+      handlers.onOversized?.();
     }
   }
 
   _tryParse() {
+    if (this.oversized) return null;
     const b = this.buf;
     if (b.length < 2) return null;
     const fin = (b[0] & 0x80) !== 0;
@@ -79,6 +98,10 @@ export class FrameParser {
       if (b.length < offset + 8) return null;
       len = Number(b.readBigUInt64BE(offset));
       offset += 8;
+    }
+    if (len > MAX_INBOUND_FRAME_BYTES) {
+      this.oversized = true;
+      return null;
     }
     let maskKey = null;
     if (masked) {
@@ -105,6 +128,12 @@ export class FrameParser {
     if (opcode === OPCODES.PING) { handlers.onPing?.(payload); return; }
     if (opcode === OPCODES.PONG) { handlers.onPong?.(payload); return; }
     if (opcode === OPCODES.CONT) {
+      // The per-frame cap alone doesn't bound a fragmented message — many
+      // sub-cap continuation frames could still accumulate without limit.
+      if (this._fragmentBytes() + payload.length > MAX_INBOUND_FRAME_BYTES) {
+        this.oversized = true;
+        return;
+      }
       this.fragments.push(payload);
       if (fin) {
         const full = Buffer.concat(this.fragments);
@@ -124,6 +153,12 @@ export class FrameParser {
     if (opcode === OPCODES.TEXT) handlers.onMessage?.(payload.toString("utf8"));
     // Binary frames are unused by the room protocol and ignored.
   }
+
+  _fragmentBytes() {
+    let total = 0;
+    for (const fragment of this.fragments) total += fragment.length;
+    return total;
+  }
 }
 
 // Wraps a raw net.Socket as a small WebSocket connection: send(text),
@@ -139,8 +174,12 @@ export class WsConnection {
       onMessage: (m) => this._emit("message", m),
       onClose: () => this.close(1000),
       onPing: (p) => this._write(encodeFrame(OPCODES.PONG, p)),
-      onPong: () => {}
+      onPong: () => {},
+      // 1009 = "message too big". The parser is dead at this point; drop the
+      // connection rather than trusting anything after a protocol violation.
+      onOversized: () => this.close(1009)
     };
+    this._handlers = handlers;
     socket.on("data", (chunk) => this.parser.push(chunk, handlers));
     const onGone = () => this._finish();
     socket.on("close", onGone);
@@ -202,12 +241,7 @@ export function attachWebSocket(req, socket, head) {
   socket.write(handshakeResponse(key));
   const conn = new WsConnection(socket);
   if (head && head.length) {
-    conn.parser.push(head, {
-      onMessage: (m) => conn._emit("message", m),
-      onClose: () => conn.close(1000),
-      onPing: (p) => conn._write(encodeFrame(OPCODES.PONG, p)),
-      onPong: () => {}
-    });
+    conn.parser.push(head, conn._handlers);
   }
   return conn;
 }

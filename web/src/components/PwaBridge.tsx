@@ -202,7 +202,15 @@ export default function PwaBridge() {
   // ITP is rejecting cookies). Cleaner to relock immediately.
   useEffect(() => {
     if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return;
-    const channel = new BroadcastChannel("ss:auth");
+    // Constructor wrapped like signout.ts's: it can throw in restricted
+    // webviews even when the global exists; losing cross-tab relock there is
+    // acceptable — the server-side cookie clear still wins on next API call.
+    let channel: BroadcastChannel;
+    try {
+      channel = new BroadcastChannel("ss:auth");
+    } catch {
+      return;
+    }
     function onMessage(event: MessageEvent) {
       if (event.data?.kind === "signed-out") {
         clearAllNamespacedLocalState();
@@ -266,7 +274,16 @@ export default function PwaBridge() {
 
     document.addEventListener("visibilitychange", checkForUpdates);
     window.addEventListener("focus", checkForUpdates);
+    // Reload only when an *existing* controller is replaced (a deploy while
+    // this page is open). On the very first visit clients.claim() flips the
+    // controller from null → SW, which used to force a pointless reload one
+    // second after landing on /signin — possibly mid-typing.
+    let hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController) {
+        hadController = true;
+        return;
+      }
       if (refreshingRef.current) return;
       refreshingRef.current = true;
       window.location.reload();

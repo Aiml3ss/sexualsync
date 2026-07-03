@@ -16,6 +16,7 @@ import {
   createAct,
   getActs,
   getRequestBoard,
+  maybeAsk,
   remindAsk,
   replyToRequest,
   updateRequestAction,
@@ -35,7 +36,7 @@ import type {
 } from "@/lib/types";
 
 type RequestAction = "revoke" | "accept_counter" | "archive" | "pass" | "restore";
-type BusyAction = RequestAction | "reply" | "remind";
+type BusyAction = RequestAction | "reply" | "remind" | "maybe";
 
 type LoadState =
   | { kind: "loading" }
@@ -237,6 +238,29 @@ function AskDetail() {
     }
   }
 
+  async function runMaybe() {
+    if (state.kind !== "ready" || !requestId) return;
+    setBusyAction("maybe");
+    setActionError(null);
+    try {
+      const result = await maybeAsk({ workspaceId: state.workspace.id, id: requestId });
+      setState({
+        ...state,
+        board: {
+          workspaceId: result.workspaceId,
+          requests: result.requests,
+          activeRequests: result.activeRequests,
+          history: result.history,
+        },
+      });
+      if (navigator.vibrate) navigator.vibrate(6);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Couldn't save your maybe.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function runReply(decisions: ReplyDecisionPayload[], note: string) {
     if (state.kind !== "ready" || !requestId) return;
     setBusyAction("reply");
@@ -362,6 +386,7 @@ function AskDetail() {
         onAction={runAction}
         onRemind={runRemind}
         onReply={runReply}
+        onMaybe={runMaybe}
         onCreateCounterAct={runCreateCounterAct}
         highlightedFromActivity={highlightedFromActivity}
       />
@@ -404,6 +429,7 @@ function RequestDetail({
   onAction,
   onRemind,
   onReply,
+  onMaybe,
   onCreateCounterAct,
   highlightedFromActivity = false,
 }: {
@@ -415,6 +441,7 @@ function RequestDetail({
   onAction: (action: RequestAction) => Promise<void>;
   onRemind: () => Promise<void>;
   onReply: (decisions: ReplyDecisionPayload[], note: string) => Promise<void>;
+  onMaybe: () => Promise<void>;
   onCreateCounterAct: (label: string) => Promise<Act>;
   highlightedFromActivity?: boolean;
 }) {
@@ -426,7 +453,11 @@ function RequestDetail({
   const counters = requestCounterItems(request);
   const hasCounter = counters.length > 0;
   const timingCopy = timingCopyForRequest(request);
-  const awaitingMyReply = !mine && ["pending", "sent"].includes(request.status);
+  // Reply surface shows for a first answer (pending/sent) AND to convert an
+  // existing maybe ("Decide now"). Deferring itself is only offered on a first
+  // answer — you can't re-defer a maybe.
+  const awaitingMyReply = !mine && ["pending", "sent", "maybe"].includes(request.status);
+  const canDefer = !mine && ["pending", "sent"].includes(request.status);
   const canRevoke = mine && ["draft", "pending", "sent"].includes(request.status);
   const canAcceptCounter = mine
     && hasCounter
@@ -437,7 +468,9 @@ function RequestDetail({
   const canRestore = request.status === "archived";
   // Manual "Remind": only the requester, only while the Ask is still waiting.
   // Mirror the server's 1h anti-spam cooldown so the button reflects it locally.
-  const canRemind = mine && ["pending", "sent"].includes(request.status);
+  // Includes `maybe`: the requester can nudge a deferred Ask ("she said maybe")
+  // to prompt a decision, same anti-spam cooldown as a pending nudge.
+  const canRemind = mine && ["pending", "sent", "maybe"].includes(request.status);
   const lastReminderMs = request.lastReminderAt ? Date.parse(request.lastReminderAt) : 0;
   const reminderCooldownActive = lastReminderMs > 0 && Date.now() - lastReminderMs < 60 * 60 * 1000;
   const remindedAgo = lastReminderMs > 0 ? relativeAgo(lastReminderMs) : "";
@@ -535,14 +568,25 @@ function RequestDetail({
       )}
 
       {awaitingMyReply && (
-        <AskReplyForm
-          requestedActs={request.categories}
-          requestedTiming={request.timing}
-          acts={acts}
-          submitting={busyAction === "reply"}
-          onCreateAct={onCreateCounterAct}
-          onSubmit={onReply}
-        />
+        <>
+          {request.status === "maybe" && (
+            <section className="card p-5" style={{ borderColor: "rgb(var(--accent-rgb) / 0.35)" }}>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--accent)" }}>Still a maybe</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-2">
+                You said maybe on this earlier. Decide now, or leave it and come back closer to {timingCopy}.
+              </p>
+            </section>
+          )}
+          <AskReplyForm
+            requestedActs={request.categories}
+            requestedTiming={request.timing}
+            acts={acts}
+            submitting={busyAction === "reply" || busyAction === "maybe"}
+            onCreateAct={onCreateCounterAct}
+            onSubmit={onReply}
+            onMaybe={canDefer ? onMaybe : undefined}
+          />
+        </>
       )}
 
       {actionError && (
@@ -565,11 +609,15 @@ function RequestDetail({
 
       {canRemind && (
         <section className="card p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-3">Waiting on {toName}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-3">
+            {request.status === "maybe" ? `${toName} said maybe` : `Waiting on ${toName}`}
+          </p>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">
             {reminderCooldownActive
               ? `Reminded ${remindedAgo}. They'll get nudged again automatically if it keeps waiting.`
-              : `Give ${toName} a nudge to come take a look — it sends a quiet notification.`}
+              : request.status === "maybe"
+                ? `${toName} is deciding closer to ${timingCopy}. Nudge for an answer — it sends a quiet notification.`
+                : `Give ${toName} a nudge to come take a look — it sends a quiet notification.`}
           </p>
           <button
             type="button"

@@ -87,7 +87,7 @@ function legacyStoreName(name) {
   return legacyAliasCache.get(name) || "";
 }
 
-function storageKeyCandidates(name, key) {
+export function storageKeyCandidates(name, key) {
   const recordKey = String(key);
   const primary = `${name}:${recordKey}`;
   const legacy = legacyStoreName(name);

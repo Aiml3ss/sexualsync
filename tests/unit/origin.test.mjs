@@ -8,18 +8,18 @@ function req(url) {
 
 test("prefers PUBLIC_BASE_URL over AUTH_BASE_URL and the request origin", () => {
   const origin = trustedOrigin(
-    { PUBLIC_BASE_URL: "https://app.example.com", AUTH_BASE_URL: "https://auth.example" },
+    { PUBLIC_BASE_URL: "https://app.sexualsync.io", AUTH_BASE_URL: "https://auth.example" },
     req("https://request-host.example/api/invite")
   );
-  assert.equal(origin, "https://app.example.com");
+  assert.equal(origin, "https://app.sexualsync.io");
 });
 
 test("falls back to AUTH_BASE_URL when PUBLIC_BASE_URL is unset", () => {
   const origin = trustedOrigin(
-    { AUTH_BASE_URL: "https://example.com" },
+    { AUTH_BASE_URL: "https://sexualsync.io" },
     req("https://request-host.example/api/invite")
   );
-  assert.equal(origin, "https://example.com");
+  assert.equal(origin, "https://sexualsync.io");
 });
 
 test("falls back to the request origin when nothing is configured", () => {
@@ -31,16 +31,16 @@ test("a spoofed request Host can never override a configured origin", () => {
   // The core hardening: even if new URL(request.url).host is attacker-controlled
   // (Host / X-Forwarded-Host injection), a configured base URL wins.
   const origin = trustedOrigin(
-    { AUTH_BASE_URL: "https://example.com" },
+    { AUTH_BASE_URL: "https://sexualsync.io" },
     req("https://evil.attacker.example/api/review-token")
   );
-  assert.equal(origin, "https://example.com");
+  assert.equal(origin, "https://sexualsync.io");
 });
 
 test("strips a trailing slash from the configured base URL", () => {
   assert.equal(
-    trustedOrigin({ PUBLIC_BASE_URL: "https://example.com/" }, req("https://x/")),
-    "https://example.com"
+    trustedOrigin({ PUBLIC_BASE_URL: "https://sexualsync.io/" }, req("https://x/")),
+    "https://sexualsync.io"
   );
 });
 
@@ -53,8 +53,8 @@ test("preserves a configured path prefix", () => {
 
 test("ignores a malformed configured value and falls through", () => {
   assert.equal(
-    trustedOrigin({ PUBLIC_BASE_URL: "not a url", AUTH_BASE_URL: "https://example.com" }, req("https://x/")),
-    "https://example.com"
+    trustedOrigin({ PUBLIC_BASE_URL: "not a url", AUTH_BASE_URL: "https://sexualsync.io" }, req("https://x/")),
+    "https://sexualsync.io"
   );
 });
 

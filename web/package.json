@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "1.2.140",
+  "version": "1.2.157",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -27,5 +27,6 @@
   },
   "overrides": {
     "postcss": "^8.5.10"
-  }
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
 }

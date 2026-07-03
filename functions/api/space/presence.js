@@ -1,7 +1,8 @@
 // v2 · Sprint C · Presence — partner-last-seen + days-in-sync streak.
 // Called on every dashboard open; records caller's last-seen as a side-effect.
 
-import { getStore } from "../_kv.js";
+import { getStore, storageKeyCandidates } from "../_kv.js";
+import { decodeStoredJson } from "../_encrypted_store.js";
 import { mutateKey } from "../_state.js";
 import {
   getAuthenticatedIdentity,
@@ -20,11 +21,74 @@ const SEEN_FRESH_MS = 60_000;
 function presenceStore(env) { return getStore(env, STORE_NAME); }
 function presenceKey(workspaceId) { return `presence:${workspaceId}`; }
 
+function emptyPresence() {
+  return { byEmail: {}, opens: {} };
+}
+
+function normalizePresenceRecord(value) {
+  if (!value || typeof value !== "object") return emptyPresence();
+  const byEmail = {};
+  const opens = {};
+  for (const [email, seen] of Object.entries(value.byEmail || {})) {
+    const normalized = normalizeEmail(email);
+    if (normalized && typeof seen === "string" && seen) byEmail[normalized] = seen;
+  }
+  for (const [email, days] of Object.entries(value.opens || {})) {
+    const normalized = normalizeEmail(email);
+    if (!normalized || !days || typeof days !== "object") continue;
+    opens[normalized] = {};
+    for (const [dk, active] of Object.entries(days)) {
+      if (active) opens[normalized][dk] = true;
+    }
+  }
+  return { byEmail, opens };
+}
+
+function newerSeen(a, b) {
+  if (!a) return b || "";
+  if (!b) return a;
+  const at = Date.parse(a);
+  const bt = Date.parse(b);
+  if (Number.isFinite(at) && Number.isFinite(bt)) return bt > at ? b : a;
+  return b || a;
+}
+
+function mergePresenceRecords(...records) {
+  const merged = emptyPresence();
+  for (const record of records) {
+    const data = normalizePresenceRecord(record);
+    for (const [email, seen] of Object.entries(data.byEmail)) {
+      merged.byEmail[email] = newerSeen(merged.byEmail[email], seen);
+    }
+    for (const [email, days] of Object.entries(data.opens)) {
+      merged.opens[email] = merged.opens[email] || {};
+      for (const [dk, active] of Object.entries(days)) {
+        if (active) merged.opens[email][dk] = true;
+      }
+    }
+  }
+  trimHistory(merged.opens);
+  return merged;
+}
+
+async function readLegacyPresenceAliases(env, workspaceId) {
+  const candidates = storageKeyCandidates(STORE_NAME, presenceKey(workspaceId)).slice(1);
+  let merged = emptyPresence();
+  for (const storageKey of candidates) {
+    try {
+      const raw = await env?.STORE?.get(storageKey, "json");
+      if (raw === null || raw === undefined) continue;
+      merged = mergePresenceRecords(merged, await decodeStoredJson(env, storageKey, raw));
+    } catch {}
+  }
+  return merged;
+}
+
 export async function readPresence(env, workspaceId) {
   try {
     const raw = await presenceStore(env).get(presenceKey(workspaceId), { type: "json" });
-    return raw && typeof raw === "object" ? raw : { byEmail: {}, opens: {} };
-  } catch { return { byEmail: {}, opens: {} }; }
+    return mergePresenceRecords(await readLegacyPresenceAliases(env, workspaceId), raw);
+  } catch { return emptyPresence(); }
 }
 export async function writePresence(env, workspaceId, data) {
   await presenceStore(env).setJSON(presenceKey(workspaceId), data);
@@ -80,8 +144,9 @@ export async function readPresenceResponse(env, ws, actorEmail, { stamp = true }
   // response is consistent on both mutateKey paths (the CAS path returns the
   // fresh-read value, not our computed `next`, when no `result` is given).
   const todayKey = dayKey(now);
+  const legacyPresence = await readLegacyPresenceAliases(env, ws.id);
   const data = await mutateKey(env, STORE_NAME, presenceKey(ws.id), (current) => {
-    const next = current && typeof current === "object" ? current : { byEmail: {}, opens: {} };
+    const next = mergePresenceRecords(legacyPresence, current);
     next.byEmail = next.byEmail || {};
     next.opens   = next.opens   || {};
     // Read-only callers (a backgrounded/realtime-driven sexboard refetch) still

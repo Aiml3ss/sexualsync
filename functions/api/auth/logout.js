@@ -1,6 +1,6 @@
 import { revokeCurrentAppSession } from "../_app_session.js";
 
-const COOKIE_CLEAR_DOMAINS = [""];
+const COOKIE_CLEAR_DOMAINS = ["", "sexualsync.io", ".sexualsync.io"];
 
 function clearCookie(name, path = "/", domain = "") {
   return [

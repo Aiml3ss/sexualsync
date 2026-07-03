@@ -2,7 +2,7 @@ import { APP_NAME } from "./_auth.js";
 
 // Generic display name in outbound mail so the lock-screen email preview
 // doesn't out the product. The address body (set via RESEND_FROM at deploy)
-// can live on your own sending domain for deliverability; what most clients
+// can still live on mail.sexualsync.io for deliverability; what most clients
 // surface first is the display name above.
 const DEFAULT_FROM = `Notifications <onboarding@resend.dev>`;
 const DEFAULT_REPLY_TO = "";
@@ -247,6 +247,22 @@ export async function sendSignInCodeEmail(env, { to, code }) {
     ctaLabel: "",
     ctaUrl: "",
     footer: `Sent privately to ${to} by ${APP_NAME}.`
+  });
+}
+
+export async function sendBetaRequestEmail(env, { to, requesterEmail }) {
+  return sendEmail(env, {
+    to,
+    subject: "New Sexualsync beta request",
+    title: "New beta interest",
+    intro: "Someone asked to hear when Sexualsync opens beta access.",
+    body: [
+      `Email: ${requesterEmail}`,
+      "This was submitted from the public preview page."
+    ],
+    ctaLabel: "",
+    ctaUrl: "",
+    footer: "Internal beta interest notification."
   });
 }
 

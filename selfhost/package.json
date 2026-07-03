@@ -11,5 +11,6 @@
     "serve": "node server.mjs",
     "smoke": "node smoke.mjs"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "license": "PolyForm-Noncommercial-1.0.0"
 }

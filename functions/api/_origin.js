@@ -51,7 +51,7 @@ function requestOrigin(request) {
  *
  * @param {{ PUBLIC_BASE_URL?: string, AUTH_BASE_URL?: string } | null | undefined} env
  * @param {Request} request
- * @returns {string} e.g. "https://your-host.example" (no trailing slash), or "" if
+ * @returns {string} e.g. "https://sexualsync.io" (no trailing slash), or "" if
  *   nothing resolves (callers fall back to a relative path).
  */
 export function trustedOrigin(env, request) {

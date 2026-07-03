@@ -167,6 +167,7 @@ export function statusLabel(status: RequestRecord["status"]): string {
   switch (status) {
     case "pending":   return "pending";
     case "sent":      return "sent";
+    case "maybe":     return "maybe";
     case "reviewed":  return "reviewed";
     case "on_deck":   return "on deck";
     case "completed": return "done";

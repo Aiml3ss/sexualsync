@@ -83,7 +83,10 @@ export function isApprovedSexActStale(request: RequestRecord, now: Date = new Da
  * means "unanswered" (any reviewer action moves it past those states).
  */
 export function isStalePendingAsk(request: RequestRecord, now: Date = new Date()): boolean {
-  if (request.status !== "pending" && request.status !== "sent") return false;
+  // `maybe` included: a deferred Ask whose window passed is as stale as an
+  // unanswered one. The server expires it on the next board read (mirrors this),
+  // but filtering client-side hides it immediately, even from cached state.
+  if (request.status !== "pending" && request.status !== "sent" && request.status !== "maybe") return false;
   return timingWindowPassed(request, now);
 }
 

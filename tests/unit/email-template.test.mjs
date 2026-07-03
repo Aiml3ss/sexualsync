@@ -16,7 +16,7 @@ test("sign-in code email renders a premium code block and discreet subject", asy
   try {
     const result = await sendSignInCodeEmail({
       RESEND_API_KEY: "test",
-      RESEND_FROM: "Notifications <notify@example.test>",
+      RESEND_FROM: "Notifications <hello@mail.sexualsync.io>",
     }, {
       to: "person@example.test",
       code: "123456",

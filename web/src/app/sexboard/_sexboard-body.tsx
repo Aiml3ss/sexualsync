@@ -790,6 +790,37 @@ function buildHandoffs({
       return;
     }
 
+    // A deferred Ask. On the reviewer's board it's a "needs you" — she owes a
+    // final call — with copy that escalates from "decide by <when>" to a direct
+    // "yes or no?" once the timing window has actually arrived (Tomorrow rolls
+    // to Tonight via currentTimingLabel). On the requester's board it's a soft
+    // waiting row with a Nudge that routes to the Ask (where Remind lives).
+    if (request.status === "maybe") {
+      const decideNow = timingLabel === "Tonight" || timingLabel === "Mid-day";
+      if (fromPartner) {
+        needsYou.push({
+          id: `request-${request.id}`,
+          href,
+          eyebrow: `${request.requesterName || partnerName} sent an Ask`,
+          title,
+          body: decideNow
+            ? "Still a maybe from earlier — yes or no?"
+            : `Maybe · decide closer to ${timingLabel.toLowerCase()}.`,
+          action: decideNow ? "Decide" : "Decide now",
+        });
+      } else {
+        waiting.push({
+          id: `request-${request.id}`,
+          href,
+          eyebrow: "You sent an Ask",
+          title,
+          body: `${partnerName} said maybe · deciding by ${timingLabel.toLowerCase()}.`,
+          action: "Nudge",
+        });
+      }
+      return;
+    }
+
     if (!fromPartner) {
       waiting.push({
         id: `request-${request.id}`,

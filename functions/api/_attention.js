@@ -20,7 +20,10 @@
 import { normalizeEmail } from "./_auth.js";
 import { ensurePlatformIdentity, findWorkspace } from "./_workspaces.js";
 
-const REPLYABLE_STATUSES = new Set(["pending", "sent"]);
+// Includes `maybe`: a deferred Ask still owes the reviewer a final decision, so
+// it counts as "needs you" for her exactly like a never-answered pending/sent
+// one. Mirrors request-board.js REPLYABLE_STATUSES and buildHandoffs().
+const REPLYABLE_STATUSES = new Set(["pending", "sent", "maybe"]);
 
 // Mirrors web/src/app/sexboard/_sexboard-helpers.ts `hasKinkResponseFrom`: a
 // kink counts as "answered by me" if I appear in its status history, reactions,

@@ -24,7 +24,7 @@ import { isSelfHostNodeRuntime } from "./_runtime.js";
 import { selfHostLocalPasswordAllowsEmail } from "./auth/_local_password.js";
 import { PRIVATE_PREVIEW_DENIED_MESSAGE, privatePreviewAllowsIdentity } from "./auth/_private_preview.js";
 
-export const APP_NAME = "Sexualsync";
+export const APP_NAME = "sexualsync.io";
 
 export const LEGACY_WORKSPACE_ID = "legacy-couple";
 export const LEGACY_WORKSPACE_NAME = APP_NAME;

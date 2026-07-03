@@ -5,6 +5,13 @@ type Options = {
   once?: boolean;
   rootMargin?: string;
   threshold?: number;
+  /**
+   * Scroll container to measure against (default: the viewport). Pass a ref
+   * when the observed element lives inside its own overflow-scroll element —
+   * e.g. the GIF picker grid — so `rootMargin` preloads within that container
+   * instead of the page viewport.
+   */
+  root?: RefObject<Element | null>;
 };
 
 /**
@@ -18,9 +25,10 @@ type Options = {
 export function useInView<T extends HTMLElement = HTMLDivElement>(
   options: Options = {},
 ): [RefObject<T>, boolean] {
-  const { once = true, rootMargin = "0px 0px -10% 0px", threshold = 0.12 } = options;
+  const { once = true, rootMargin = "0px 0px -10% 0px", threshold = 0.12, root } = options;
   const ref = useRef<T>(null);
   const [inView, setInView] = useState(false);
+  const rootEl = root?.current ?? null;
 
   useEffect(() => {
     const el = ref.current;
@@ -43,11 +51,11 @@ export function useInView<T extends HTMLElement = HTMLDivElement>(
           }
         }
       },
-      { rootMargin, threshold },
+      { root: rootEl, rootMargin, threshold },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [once, rootMargin, threshold]);
+  }, [once, rootMargin, threshold, rootEl]);
 
   return [ref, inView];
 }

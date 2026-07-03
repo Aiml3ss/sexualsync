@@ -5,6 +5,7 @@ const APP_VERSION = "__SW_VERSION__";
 const CACHE_NAME = `sexualsync-shell-${APP_VERSION}`;
 const CORE_ASSETS = [
   "/",
+  "/signin",
   "/offline",
   "/thank-you",
   "/manifest.webmanifest",
@@ -74,8 +75,10 @@ self.addEventListener("push", (event) => {
   }
   const options = {
     body: data.body || "Tap to view.",
-    icon: "/app-icon.svg",
-    badge: "/app-icon.svg",
+    // Raster, not SVG: Android Chrome renders SVG notification icons as the
+    // generic bell. iOS ignores both and uses the app icon.
+    icon: "/brand/marks/app-icon-192.png",
+    badge: "/brand/marks/app-icon-192.png",
     tag: data.tag || "sexualsync",
     renotify: true,
     data: { url: notificationUrl(data.url), actions: actionUrls }
@@ -108,25 +111,57 @@ self.addEventListener("notificationclick", (event) => {
   const url = (event.action && event.notification.data?.actions?.[event.action])
     || (event.notification.data && event.notification.data.url)
     || "/";
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-      // Focus any open window first
-      for (const client of clients) {
-        if (client.url.includes(self.registration.scope) && "focus" in client) {
-          client.navigate(url);
-          return client.focus();
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    // Focus any open window first. WindowClient.navigate() rejects for
+    // uncontrolled clients and is flaky on iOS standalone, so fall back to a
+    // fresh window instead of silently landing on the wrong page.
+    for (const client of clients) {
+      if (client.url.includes(self.registration.scope) && "focus" in client) {
+        try {
+          const focused = await client.focus();
+          await (focused || client).navigate(url);
+          return;
+        } catch {
+          break;
         }
       }
-      // Otherwise open a new one
-      return self.clients.openWindow(url);
-    })
-  );
+    }
+    try {
+      await self.clients.openWindow(url);
+    } catch {
+      // No gesture context / popup blocked — nothing further we can do.
+    }
+  })());
 });
+
+// CacheStorage reads can reject under private-mode/zero-quota conditions; a
+// failed match must degrade to "not cached", never break the response path.
+async function safeMatch(request, options) {
+  try {
+    return await caches.match(request, options);
+  } catch {
+    return undefined;
+  }
+}
+
+// Cache writes are best-effort: tie them to the event so iOS doesn't kill the
+// SW mid-put, and swallow quota failures (private mode) — the response was
+// already returned to the page either way.
+function cachePut(event, request, response) {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, response)).catch(() => {})
+  );
+}
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
+
+  // Same-origin only: a cross-origin GET whose pathname happens to collide
+  // with a shell path must not be intercepted or written into the shell cache.
+  if (url.origin !== self.location.origin) return;
 
   // Never intercept API calls, CF Access endpoints, or function-style routes.
   if (url.pathname.startsWith("/api/")) return;
@@ -138,15 +173,14 @@ self.addEventListener("fetch", (event) => {
   // standalone PWA reopens as a fresh process and would otherwise re-download the
   // whole JS/CSS payload over the network every launch. A new build requests new
   // hashed URLs; the versioned CACHE_NAME drops the stale set on activate.
-  if (url.origin === self.location.origin && url.pathname.startsWith("/_next/static/")) {
+  if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith((async () => {
-      const cached = await caches.match(event.request);
+      const cached = await safeMatch(event.request);
       if (cached) return cached;
       try {
         const response = await fetch(event.request);
         if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          cachePut(event, event.request, response.clone());
         }
         return response;
       } catch {
@@ -161,21 +195,26 @@ self.addEventListener("fetch", (event) => {
   const requestPath = `${url.pathname}${url.search}`;
   const isShellAsset = CORE_ASSETS.includes(requestPath) || CORE_ASSETS.includes(url.pathname);
   const isNavigation = event.request.mode === "navigate";
-  if (!isShellAsset) return;
 
   const isStaticShellAsset = isShellAsset && !isNavigation && url.pathname !== "/";
   if (isStaticShellAsset) {
     event.respondWith((async () => {
-      const cached = await caches.match(event.request) || await caches.match(url.pathname);
+      const cached = await safeMatch(event.request) || await safeMatch(url.pathname);
       const update = fetch(event.request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        if (response.ok) cachePut(event, event.request, response.clone());
         return response;
       }).catch(() => null);
       return cached || await update || Response.error();
     })());
     return;
   }
+
+  // ALL same-origin navigations — not just the precached shell paths. This is
+  // what lets a cold offline launch of the installed PWA (start_url is
+  // /signin?source=pwa, and users live on /sexboard, /chat, /space/...) paint
+  // a cached page or the neutral /offline fallback instead of the browser's
+  // raw connection-error screen.
+  if (!isNavigation) return;
 
   event.respondWith((async () => {
     // Network-first, but don't hang on lie-fi. A connected-but-stalled link
@@ -191,18 +230,20 @@ self.addEventListener("fetch", (event) => {
     try {
       const response = await Promise.race([fetch(event.request), timeout]);
       clearTimeout(timer);
-      const copy = response.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      // Only cache good responses: a cached 500/404 would replay as the
+      // "offline" experience for that route until the next deploy.
+      if (response.ok) cachePut(event, event.request, response.clone());
       return response;
     } catch {
       clearTimeout(timer);
-      const cached = await caches.match(event.request);
+      // ignoreSearch so /signin?source=pwa (and any ?source=shortcut route)
+      // matches the cached copy of its base path.
+      const cached = await safeMatch(event.request, { ignoreSearch: true });
       if (cached) return cached;
       // Offline/timed-out navigations get a dedicated neutral fallback rather
       // than "/" (the signin/marketing shell), which would make an
       // authenticated user look logged out.
-      if (isNavigation) return (await caches.match("/offline")) || Response.error();
-      return Response.error();
+      return (await safeMatch("/offline")) || Response.error();
     }
   })());
 });

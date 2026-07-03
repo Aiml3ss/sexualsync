@@ -4,7 +4,10 @@ export const ROOM_E2EE_PLACEHOLDER = "Encrypted content";
 export const ROOM_E2EE_LOCKED_LABEL = "Encrypted - unlock in Privacy";
 const ROOM_E2EE_VERIFIER_PURPOSE = "workspace-verifier";
 
-export const ROOM_E2EE_DEVICE_UNLOCK_DAYS = 7;
+// How long a device stays unlocked after the passphrase is entered before it
+// must be re-entered. The away/background relock window derives from the same
+// value. Release gate pins this literal (release-security-check.mjs).
+export const ROOM_E2EE_DEVICE_UNLOCK_DAYS = 30;
 export const ROOM_E2EE_SESSION_RELOCK_MS = ROOM_E2EE_DEVICE_UNLOCK_DAYS * 24 * 60 * 60 * 1000;
 const ROOM_E2EE_ITERATIONS = 310_000; // v1 — PBKDF2-SHA256 (OWASP 2021). Never lower; release gate pins this literal.
 const ROOM_E2EE_ITERATIONS_V2 = 600_000; // v2 — PBKDF2-SHA256 (OWASP 2023). Opt-in per deploy via ROOM_E2EE_KDF_VERSION.
