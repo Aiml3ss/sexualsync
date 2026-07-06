@@ -12400,20 +12400,20 @@ button.card:active,
 .chat-react-picker .chat-react-btn { font-size: 24px; padding: 6px 8px; }
 /* iMessage-style action menu BELOW the held message (Reply / Copy / …). */
 .chat-context-menu {
-  position: absolute;
-  top: calc(100% + 8px);
+  position: relative;
   z-index: 62;
   display: flex;
   flex-direction: column;
   min-width: 168px;
   padding: 4px;
+  margin-top: 4px;
   border-radius: 14px;
   background: var(--surface-2);
   box-shadow: var(--ring-hairline-strong), 0 10px 28px rgb(0 0 0 / 0.45);
   animation: chat-bubble-pop var(--dur-state) var(--ease-press) backwards;
 }
-.chat-context-menu.is-mine { right: 0; }
-.chat-context-menu.is-theirs { left: 0; }
+.chat-context-menu.is-mine { align-self: flex-end; }
+.chat-context-menu.is-theirs { align-self: flex-start; }
 .chat-context-item {
   display: flex;
   align-items: center;

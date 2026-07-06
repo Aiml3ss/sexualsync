@@ -209,6 +209,18 @@ const activityResponse = {
   ],
 };
 
+const chatSeedMessages = [
+  {
+    id: "chat-1",
+    seq: 1,
+    email: "jordan@example.test",
+    name: "Jordan",
+    text: "Hold this message",
+    at: "2026-05-23T00:12:00.000Z",
+    reactions: [],
+  },
+];
+
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -606,6 +618,51 @@ async function mockApi(page, state = {}) {
       }
       return json(activity);
     }
+    if (pathname === "/api/chat") {
+      state.chatMessages = state.chatMessages || cloneJson(chatSeedMessages);
+      state.chatReadCursors = state.chatReadCursors || {};
+      state.chatReadAt = state.chatReadAt || {};
+
+      if (method === "GET") {
+        const after = Number(requestUrl.searchParams.get("after") || 0);
+        const messages = after > 0
+          ? state.chatMessages.filter((message) => Number(message.seq) > after)
+          : state.chatMessages;
+        return json({
+          workspaceId: workspace.id,
+          messages,
+          readCursors: state.chatReadCursors,
+          readAt: state.chatReadAt,
+        });
+      }
+
+      const body = route.request().postDataJSON();
+      if (method === "PATCH") {
+        if (body.action === "read") {
+          state.chatReadCursors[auth.email] = Math.max(Number(state.chatReadCursors[auth.email]) || 0, Number(body.seq) || 0);
+          state.chatReadAt[auth.email] = "2026-05-23T00:20:00.000Z";
+          return json({ readCursors: state.chatReadCursors, readAt: state.chatReadAt });
+        }
+        return json({ ok: true });
+      }
+
+      if (method === "POST") {
+        state.chatPostBody = body;
+        const nextSeq = state.chatMessages.reduce((max, message) => Math.max(max, Number(message.seq) || 0), 0) + 1;
+        const message = {
+          id: `chat-${nextSeq}`,
+          seq: nextSeq,
+          email: auth.email,
+          name: auth.person,
+          text: body.text || "",
+          at: "2026-05-23T00:21:00.000Z",
+          reactions: [],
+          ...(body.replyToId ? { replyToId: body.replyToId } : {}),
+        };
+        state.chatMessages.push(message);
+        return json({ workspaceId: workspace.id, message }, 201);
+      }
+    }
     if (pathname === "/api/fantasy-backlog") {
       const fantasy = state.fantasy || { workspaceId: workspace.id, reactionCatalog: [], ideas: [kink], graveyard: [] };
       state.fantasy = fantasy;
@@ -848,6 +905,62 @@ test("Space reconnects granted notification permission to push subscription stor
   // all-on — i.e. a deploy never silently changes the user's notification prefs.
   expect(state.pushSubscribeBody?.preferences?.["game-ready"]).toBe(false);
   await expect(page.getByText("Notifications are on for this device.")).toBeVisible();
+});
+
+test("Sext long-press reply survives small finger movement", async ({ page }) => {
+  const state = {};
+  await mockApi(page, state);
+  await page.goto("/chat");
+
+  const bubble = page.getByRole("button", { name: "Hold this message" });
+  await expect(bubble).toBeVisible();
+  const box = await bubble.boundingBox();
+  expect(box).toBeTruthy();
+  const x = box.x + Math.min(32, box.width / 2);
+  const y = box.y + Math.min(20, box.height / 2);
+
+  await bubble.dispatchEvent("pointerdown", {
+    pointerId: 23,
+    pointerType: "touch",
+    isPrimary: true,
+    button: 0,
+    buttons: 1,
+    clientX: x,
+    clientY: y,
+    bubbles: true,
+    cancelable: true,
+  });
+  await page.waitForTimeout(160);
+  await bubble.dispatchEvent("pointermove", {
+    pointerId: 23,
+    pointerType: "touch",
+    isPrimary: true,
+    button: 0,
+    buttons: 1,
+    clientX: x + 6,
+    clientY: y + 4,
+    bubbles: true,
+    cancelable: true,
+  });
+
+  await expect(page.getByRole("menu", { name: "Message actions" })).toBeVisible();
+  await bubble.dispatchEvent("pointerup", {
+    pointerId: 23,
+    pointerType: "touch",
+    isPrimary: true,
+    button: 0,
+    buttons: 0,
+    clientX: x + 6,
+    clientY: y + 4,
+    bubbles: true,
+    cancelable: true,
+  });
+  await page.getByRole("button", { name: "Reply" }).click();
+
+  await expect(page.getByText("Replying to Jordan")).toBeVisible();
+  await page.getByPlaceholder(/Message Jordan/).fill("replying now");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect.poll(() => state.chatPostBody?.replyToId).toBe("chat-1");
 });
 
 test("Ask surfaces saved library Acts before collapsed defaults", async ({ page }) => {

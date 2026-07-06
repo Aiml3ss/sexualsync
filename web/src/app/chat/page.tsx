@@ -87,6 +87,8 @@ const TYPING_CLEAR_MS = 5000;
 // reply lookups, and seq math all use it) — only the render is windowed.
 const CHAT_WINDOW_INITIAL = 150;
 const CHAT_WINDOW_STEP = 200;
+const CHAT_LONG_PRESS_MS = 420;
+const CHAT_LONG_PRESS_MOVE_TOLERANCE_PX = 12;
 
 // One-line preview of a message for the reply banner + the quoted-reply chip.
 function messagePreview(m: ChatMessage): string {
@@ -1014,37 +1016,53 @@ function ChatBubble({
     ? redgifsIdFromUrl((message.text || "").trim())
     : "";
 
-  // iOS Messages–style hold-to-react: a ~420ms press opens the reaction picker;
-  // a quick tap toggles the action row. longPressed swallows the click the same
-  // touch delivers so a hold doesn't also fire the tap. onContextMenu covers the
-  // desktop/right-click case.
+  // iOS Messages-style hold-to-react/reply. A quick tap toggles the timestamp;
+  // a held press opens the action menu. Track pointer movement with tolerance:
+  // phones emit tiny move events during a stationary hold, while real vertical
+  // scroll should still cancel the pending action.
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStart = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const longPressed = useRef(false);
-  const beginLongPress = useCallback(() => {
+  const beginLongPress = useCallback((pointerId: number, x: number, y: number) => {
     // No actions on a deleted bubble, or one still sending (the server doesn't
     // have it yet, so react/edit/unsend would race a 404).
     if (message.deletedAt || message.pending) return;
     longPressed.current = false;
+    longPressStart.current = { pointerId, x, y };
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
     longPressTimer.current = setTimeout(() => {
       longPressed.current = true;
+      longPressStart.current = null;
+      longPressTimer.current = null;
       if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
         try { navigator.vibrate(8); } catch { /* haptics optional */ }
       }
       onLongPress();
-    }, 420);
+    }, CHAT_LONG_PRESS_MS);
   }, [message.deletedAt, message.pending, onLongPress]);
   const cancelLongPress = useCallback(() => {
     if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    longPressStart.current = null;
   }, []);
+  const moveLongPress = useCallback((pointerId: number, x: number, y: number) => {
+    const start = longPressStart.current;
+    if (!start || start.pointerId !== pointerId) return;
+    if (Math.hypot(x - start.x, y - start.y) > CHAT_LONG_PRESS_MOVE_TOLERANCE_PX) cancelLongPress();
+  }, [cancelLongPress]);
+  useEffect(() => cancelLongPress, [cancelLongPress]);
   const handleTap = useCallback(() => {
     if (longPressed.current) { longPressed.current = false; return; }
     onToggle();
   }, [onToggle]);
   const pressHandlers = {
-    onTouchStart: beginLongPress,
-    onTouchEnd: cancelLongPress,
-    onTouchMove: cancelLongPress,
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+      if (e.button !== 0) return;
+      beginLongPress(e.pointerId, e.clientX, e.clientY);
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLElement>) => moveLongPress(e.pointerId, e.clientX, e.clientY),
+    onPointerUp: cancelLongPress,
+    onPointerCancel: cancelLongPress,
+    onLostPointerCapture: cancelLongPress,
     onContextMenu: (e: React.MouseEvent) => {
       if (message.deletedAt || message.pending) return;
       e.preventDefault();
