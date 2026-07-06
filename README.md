@@ -31,7 +31,7 @@ commercial or hosted-service use is reserved. See the [license](#license).
 - **Asks** — send a concrete request with acts, timing, and a filming preference.
   Your partner can accept, counter, pass, park it, or answer later.
 - **Sext** — a private message thread for two. Images are encrypted in the browser
-  before they upload.
+  before they upload, and shared GIFs stay reveal-gated in the thread.
 - **Reveals** — Sex Quiz, Green Lights, The Pile, and Blind Reveal let both people
   answer privately before anything is shown.
 - **Inspiration and Shelf** — save kinks, links, clips, and passages before they
@@ -122,8 +122,9 @@ Full config reference: [docs/self-host/CONFIG.md](docs/self-host/CONFIG.md).
 
 ```bash
 npm test                # shared handler and product unit tests
-npm run selfhost:test   # Node adapters and server
-npm run selfhost:smoke  # boots the server and runs a two-user flow
+npm run selfhost:test   # Node adapters, ws codec, room registry
+npm run selfhost:smoke  # boots the server, exercises the real handlers over HTTP
+npm run selfhost:smoke2 # two users: quiz + green-lights double-blind over HTTP
 npm run selfhost:check  # config and Docker sanity
 npm run selfhost:build  # production web build
 ```
